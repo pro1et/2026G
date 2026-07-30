@@ -1,0 +1,1844 @@
+Mizar Z7 用户手册
+
+
+
+
+                    Mizar Z7
+                    用户手册
+                Xilinx ZYNQ-7000 SoC
+                        Rev. 1.1
+Mizar Z7 用户手册
+
+
+
+版本记录
+
+版本         时间           描述
+
+Rev. 1.0   2020.05.05   第一版发布
+
+Rev. 1.1   2020.07.02   修改了电源部分的描述
+
+
+
+
+                             1 / 51
+ Mizar Z7 用户手册
+
+
+
+
+版权声明：
+ MicroPhase FPGA 开发板，XME/IME 系列核心模块、评估板及其相关知识
+产权由微相科技有限公司所有。
+ 本文档由微相科技有限公司版权所有，并保留一切权利。在未经微相公
+司书面许可的情况下，不得以任何方式或形式来修改、分发或复制本文档的
+任何部分。
+
+
+
+免责声明
+  产品中所提供的程序源代码、软件、资料文档等，微相科技不提供任何
+类型的担保；不论是明确的，还是隐含的，包括但不限于合适特定用途的保
+证，全部的风险，由使用者来承担。
+
+
+
+
+                     2 / 51
+   Mizar Z7 用户手册
+
+
+
+
+                                                                           目录
+版本记录 ..................................................................................................................................................... 1
+版权声明： ................................................................................................................................................. 2
+免责声明 ..................................................................................................................................................... 2
+目录 ............................................................................................................................................................. 3
+   1.      产品简介 ......................................................................................................................................... 5
+   2.      板卡规格 ......................................................................................................................................... 6
+        2.1       器件布局................................................................................................................................... 6
+        2.2       功能框图................................................................................................................................... 8
+        2.3       资源特性................................................................................................................................... 9
+        2.4       机械尺寸................................................................................................................................. 10
+   3.      硬件资源 ....................................................................................................................................... 12
+        3.1       ZYNQ 芯片 .............................................................................................................................. 12
+        3.2       ZYNQ 启动模式 ...................................................................................................................... 14
+        3.3       JTAG ........................................................................................................................................ 15
+        3.4       时钟......................................................................................................................................... 16
+        3.5       复位......................................................................................................................................... 19
+        3.6       PS 侧外设 ................................................................................................................................ 19
+           3.6.1         DDR3 RAM ....................................................................................................................... 19
+           3.6.2         QSPI Flash ........................................................................................................................ 20
+           3.6.3         Wi-Fi ................................................................................................................................ 21
+           3.6.4         千兆以太网 ..................................................................................................................... 24
+           3.6.5         USB 接口 ......................................................................................................................... 26
+           3.6.6         SD Card ............................................................................................................................ 28
+           3.6.7         USB 串口 ......................................................................................................................... 29
+           3.6.8         用户按键 ......................................................................................................................... 30
+           3.6.9         用户 LED .......................................................................................................................... 31
+        3.7       PL 侧接口 ................................................................................................................................ 32
+
+
+
+                                                                            3 / 51
+Mizar Z7 用户手册
+
+   3.7.1      HDMI TX(HDMI1) ............................................................................................................. 32
+   3.7.2      HDMI RX(HDMI2)............................................................................................................. 34
+   3.7.3      MIPI CSI ........................................................................................................................... 36
+   3.7.4      EEPROM ........................................................................................................................... 38
+   3.7.5      用户按键 ......................................................................................................................... 39
+   3.7.6      用户 LED .......................................................................................................................... 40
+   3.7.7      GPIO 扩展口.................................................................................................................... 41
+   3.7.8      GPIO 电压调整................................................................................................................ 48
+ 3.8   电源......................................................................................................................................... 49
+
+
+
+
+                                                                 4 / 51
+ Mizar Z7 用户手册
+
+
+
+
+1.       产品简介
+         Mizar Z7 是微相科技推出的一款基于 Xilinx Zynq-700 系列的 SoC 开发板，Zynq-7000
+集成了 1 个双核 ARM Cortex-A9 处理器，以及 Xilinx 7 系列现场可编程门阵列（FPGA）逻
+辑，这种 FPGA+ARM 的架构在传统 CPU+FPGA 应用领域提供了一种替代升级的解决方案，
+其单芯片的 SoC 的解决方案，在价格和开发难度上都具有很大优势。
+
+         Mizar Z7 是微相科技面向创客、嵌入式爱好者、学生、教育工作者以及电子发烧友
+等群体开发的一款开源的创客神器。它基于 Xilinx 公司的 Zynq-7000 系列的 SoC 的嵌入式
+开发平台，Zynq-7000 集成了 1 个双核 ARM Cortex-A9 处理器，以及 Xilinx 7 系列现场可编
+程门阵列（FPGA）逻辑器件，这种 FPGA+ARM 的架构在传统 CPU+FPGA 应用领域提供了
+一种替代升级的解决方案，其单芯片 SoC 的解决方案，在价格和开发难度上都具有很大优
+势，这种方案已经成为广大用户的优选方案。
+
+         Mizar Z7 主芯片兼容 XC7Z010CLG400-1 和 XC7Z020CLG400-2，其型号分别为 Mizar
+Z7010 和 Mizar Z7020。其产品特点：
+
+         1. 板载千兆以太网，USB OTG，UART 串口，HDMI 接口，MIPI-CSI 接口，Wi-Fi 带蓝
+牙，同时配有 2×40Pin 扩展板接口。
+
+         2. 产品使用方式灵活，既可以当单板开发板使用，也可以当开发板使用，可谓是一
+板多用。
+
+         3.其小巧灵活的特点可以广泛应用在各类领域上，加上 ZYNQ 所特有的可编程逻辑开
+发与嵌入式开发相结合，在高速帧率的视频处理、硬件加速、IoT 应用，工业实时控制，
+人工智能，机器人等方面所表现出更的卓越性能和更强的通用性。
+
+         Mizar Z7 在以下创客所能想到的应用领域具有突出的应用开发优势：
+
+        机器视觉
+
+        人工智能
+
+
+                                   5 / 51
+ Mizar Z7 用户手册
+
+        工业控制
+
+        无人机
+
+        嵌入式硬件加速
+
+        运动控制，机器人
+
+        IoT 应用
+
+         Mizar Z7 设计小巧紧凑的特点，既适合作为掌中开发神器，成为你忠实的朋友，帮
+你思维变成现实；亦可以作为核心模块嵌入到应用产品中，成为你可信任的产品，加速
+你的产品推向市场；还可以作为随身携带的口袋实验室，成为你学习的好工具，让你早
+日成为技术大神。
+
+
+
+2.       板卡规格
+2.1      器件布局
+
+         MIZAR Z7 模块功能框图如 Figure 2-1 和 Figure 2-2 所示
+
+
+
+
+                                       6 / 51
+Mizar Z7 用户手册
+
+
+
+
+                Figure 2-1 MIZAR Z7 TOP 面器件布局图
+
+
+
+
+                             7 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                    Figure 2-2 MIZAR Z7 Bottom 面器件布局图
+
+
+
+
+2.2   功能框图
+
+      MIZAR Z7 模块功能框图如 Figure 2-3 所示
+
+
+
+
+                                  8 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                      Figure 2-3 MIZAR Z7 功能框图
+
+2.3    资源特性
+
+      MIZAR Z7 提供了如下硬件资源。
+
+        特性       描述
+
+                 Mizar Z7010 搭载 Xilinx XC7Z010-1CLG400，k LCs
+      ZYNQ 处理器
+                 Mizar Z7020 搭载 Xilinx XC7Z020-2CLG400，k LCs
+
+                 Mizar Z7010 512MB DDR3 RAM, 32Bit
+      DDR3 RAM
+                 Mizar Z7020 1GB DDR3 RAM, 32Bit
+
+        时钟       PS 时钟输入 33.333333MHz，PL 时钟输入 50MHz
+
+                 板载 USB Cable 电路，可以在线调试与下载，
+        JTAG
+                 无需额外购买下载器/仿真器
+
+        Flash    256Mbit QSPI Flash
+
+
+
+                                 9 / 51
+ Mizar Z7 用户手册
+
+
+         网络        10/100/1000M 自适应
+
+       USB Host    USB2.0，标准 A 型接口
+
+       USB Slave   USB2.0，标准 Micro USB 接口
+
+      Wi-Fi 无线     802.11b/g/n
+
+         蓝牙        4.0 双模
+
+         天线        Wi-Fi 和蓝牙共用，板载陶瓷天线及 IPX 天线接口
+
+         串口        USB 转 UART，标准 Micro USB 接口
+
+       TF 卡槽       Micro SD 卡槽一个
+
+       HDMI TX     一路 HDMI 输出接口，最高可支持 1080p@60Hz
+
+       HDMI RX     一路 HDMI 输入接口，仅 Mizar Z7020 支持
+
+       MIPI CSI    一路 MIPI CSI 摄像头接口，仅 Mizar Z7020 支持
+
+         按键        7 个按键，4 个 PL 按键，2 个 PS 按键，1 个系统复位按键
+
+                   8 个 LED，4 个 PL 控制，2 个 PS 控制，
+         LED
+                   1 个配置状态，1 个电源状态
+
+                   2 组 40pin，2.54mm 间距，共 72 个 GPIOs，
+      GPIO 扩展口
+                   48 个 IOs 电压可调，24 个 IO 电压 3.3V
+
+         PCB       8 层沉金工艺, 125*90mm
+
+         供电        5V/2A，或通过 40pin 的电源脚供电。
+
+
+
+2.4    机械尺寸
+
+      MIZAR Z7 机械尺寸为: 125*90mm， 尺寸图如
+
+
+
+
+                                 10 / 51
+Mizar Z7 用户手册
+
+
+
+
+                Figure 2-4 MIZAR Z7 机械尺寸图
+
+
+
+
+                          11 / 51
+ Mizar Z7 用户手册
+
+
+
+
+3.    硬件资源
+3.1   ZYNQ 芯片
+
+      MIZAR Z7 使用 Xilinx Zynq-7000 SoC 作为核心芯片，型号为：XC7Z010CLG400-1,
+XC7Z020CLG400-2, Zynq-7000 系列芯片是将双核 ARM Cortex-A9 处理器和 FPGA 可编程逻辑
+单元集成在一颗单芯片中，从而构成了 PS(Processing System)加 PL(Programmable Logic)的
+单芯片 SoC 解决方案。芯片的 PS 系统集成了两个 ARM Cortex-A9 处理器，AMBA 互连，内
+部存储器，外部存储器接口和外设。这些外设主要包括以太网接口，SD/SDIO 接口，USB
+总线接口，I2C 总线接口，SPI 总线接口，CAN 总线接口，UART 接口，GPIO 等。PS 可以独
+立运行并在上电或复位下启动。
+
+      Zynq-7000 整体框图如 Figure 3-1 所示：
+
+
+
+
+                                  12 / 51
+ Mizar Z7 用户手册
+
+                         Figure 3-1 Zynq-7000 Block Diagram
+
+   其中 PS 部分的资源如下：
+
+   -   双核 ARM Cortex-A9 处理器，支持对称和非对称配置，ARM-V7 指令集，主频高
+       达 766MHz
+   -   32KB 指令和 32KB 数据 L1 缓存，512KB 共享 L2 缓存。
+   -   片上 Boot ROM 和 256KB 的片上 SRAM。
+   -   外部存储接口，支持 16/32 bit DDR3, DDR3L, DDR2, LPDDR-2 接口
+   -   Quad-SPI 控制器
+   -   两个千兆网卡支持： DMA ，GMII，RGMII，SGMII 接口
+   -   两个 USB2.0 OTG 接口，每个最多支持 12 节点
+   -   两个 CAN2.0B 总线接口
+   -   两个 SD 卡、SDIO、MMC 兼容控制器
+   -   2 个 SPI，2 个 UARTs，2 个 I2C 接口
+   -   4 组 32bit GPIO，54（32+22）作为 PS 系统 IO，64 连接到 PL
+   -   PS 内和 PS 到 PL 的高带宽连接
+
+   其中 PL 部分的资源如下：
+
+   -   逻辑单元 Logic Cells: 74K；
+   -   查找表 LUTs: 46,200
+   -   触发器(flip-flops): 92,400
+   -   乘法器 18x25MACCs: 160;
+   -   Block RAM：3.3Mb；
+   -   4 路 6.25Gbps 高速 GTP 收发器，支持 PCIE Gen2x4；
+   -   2 个 AD 转换器，可以测量片上电压、温度感应和高达 17 外部差分输入通道，
+       1Mbps
+
+   MIZAR Z7 上使用的 FPGA 芯片型号为：XC7Z015-2CLG485I，
+
+Zynq-7000 FPGA 型号定义如下：
+
+
+
+                                      13 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                         Figure 3-2 Zynq-7000 命名规则
+
+      Zynq-7000 资源表如果 Figure 3-3 所示：
+
+
+
+
+                        Figure 3-3 Zynq-7000 FPGA 资源表
+
+3.2   ZYNQ 启动模式
+
+      ZYNQ 的启动模式通过 MIZAR Z7 开发板上的拨码开关 J1 的 ON/OFF 状态去配置。
+MIZAR Z7 支持三种启动模式，分别为：SD 卡启动，QSPI 启动，JTAG 模式。ZYNQ 系统上
+电后，会检测相应管脚的电平状态决定何种方式启动，用户可以通过拨码开关 J1 开关状
+态去选择启动模式。
+
+
+
+                                   14 / 51
+ Mizar Z7 用户手册
+
+      MIZAR Z7 的启动方式配置原理图如下图 Figure 3-4 所示
+
+
+
+
+                        Figure 3-4 MIZAR Z7 启动配置原理图
+
+注： MIZAR Z7 不支持 NAND 启动
+
+
+3.3   JTAG
+      MIZAR Z7 提供 USB 下载接口，在电路板上板载了 USB JTAG Cable 的下载电路，用户
+只需要一根 Micro USB 线就可以对 ZYNQ 进行下载程序，在线调试程序，用户无需额外购
+买专用下载器，这样极大降低用户的使用成本。
+
+      MIZAR Z7 的 JTAG 原理图如图 Figure 3-5 所示
+
+
+
+
+                                   15 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                      Figure 3-5 MIZAR Z7 USB JTAG 实物图
+
+3.4   时钟
+
+      MIZAR Z7 开发板提供了 2 路有源时钟，分别提供给 PS 系统和 PL 逻辑部分，PS 系统
+和 PL 逻辑可以独立工作。
+
+      MIZAR Z7 时钟与 Zynq-7000 SoC 连接示意图如下图 Figure 3-6 所示
+
+
+
+
+                                   16 / 51
+ Mizar Z7 用户手册
+
+
+
+
+      33.3333MHz     PS_CLK_33d3         Bank 500
+       Oscillator                        PIN: E7
+
+
+                                                ARM(PS)
+                                               FPGA(PL)
+         50MHz       PS_CLK_33d3         Bank 35
+        Oscillator                       PIN: H16
+
+
+
+
+                     Figure 3-6 时钟与 ZYNQ 连接示意图
+
+    PS 系统时钟
+
+    MIZAR Z7 开发板上为 PS 系统提供了 33.33333MHz 的有源时钟，时钟的输入连接到
+ZYNQ 芯片的 BANK500 的 PS_CLK_500 的管脚上。
+
+    PS 系统时钟原理图如下图 Figure 3-7 所示：
+
+
+
+
+                               17 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                         Figure 3-7 PS 系统时钟电路图
+
+   PS 时钟输入分配如下表 Table 3-1 所示：
+
+             信号名            ZYNQ Pin Name         Pin Num
+
+           PS_CLK_33d3       PS_CLK_500             E7
+
+                         Table 3-1 PS 时钟输入管脚分配
+
+   PL 系统时钟
+
+   MIZAR Z7 开发板上为 PL 系统提供了 50MHz 的有源时钟，时钟的输入连接到 ZYNQ 芯
+片的 BANK13 的管脚 Y14 上。
+
+   PL 时钟输入分配如下表 Table 3-2 所示：
+
+             信号名            ZYNQ Pin Num.          描述
+
+           PL_CLK_50M           H16         连接至 Bank13 MRCC
+
+                         Table 3-2 PL 时钟输入管脚分配
+
+
+
+
+                                  18 / 51
+ Mizar Z7 用户手册
+
+
+3.5   复位
+
+      MIZAR Z7 开发板上提供了一路系统硬复位，低电平有效，复位按键 K1 经过复位电
+源监控芯片后，输出信号至 ZYNQ 管脚的 PS_POR_B，当然 K1 按下时为低时，或者板 3.3V
+电源的电压低于 2.93V，将会产生系统复位。
+
+      复位电路原理图如下图 Figure 3-8 所示：
+
+
+
+
+                           Figure 3-8 复位电路电路图
+
+      复位信号与 FPGA 连接分配表
+
+          Signal Name   FPGA Pin                说明
+
+      POR_nRST            B18      复位信号使能，或 3.3V 电源输出低于 2.93V
+
+                        Table 3-3 系统硬件复位管脚分配
+
+
+3.6   PS 侧外设
+
+3.6.1 DDR3 RAM
+      模块采用两片 16 位的 DDR3 内存芯片，Mizar Z7010 版为 512MB，Mizar Z7020 版为
+1GB, 数据位宽为 32 位。所使用 DDR3 型号，Mizar Z7010 参数兼容 MT41J128M16 HA-125
+（在 Vivado ZYNQ 开发过程中，DDR3 型号可使用 MT41J128M16 HA-125），Mizar Z7020 参
+数 兼 容 MT41J256M16 RE-125 （ 在 Vivado ZYNQ 开 发 过 程 中 ， DDR3 型 号 可 使 用
+MT41J256M16 RE-125 ） 。 DDR3 SDRAM 的 最 高 运 行 时 钟 速 度 可 达 533MHz( 数 据 速 率
+
+
+                                    19 / 51
+ Mizar Z7 用户手册
+
+1066Mbps)，DDR3 芯片连接到 PS BANK 502 存储器接口上。DDR 控制器接口 PS BANK 502，
+32bit 数据总线。
+
+    DDR3 的硬件设计需要严格考虑信号完整性，我们在电路设计和 PCB 设计的时候已
+经充分考虑了匹配电阻/终端电阻，走线阻抗控制，走线等长控制，保证 DDR3 的高速稳
+定的工作。
+
+    ZYNQ PS Bank502 与 DDR3 硬件连接示意图如下图 Figure 3-9 所示
+
+
+
+
+                                 Data x16
+                                                       DDR3 Device
+                               Address & Command
+                   Bank 502
+
+                                 Data x16              DDR3 Device
+
+
+
+
+                        Figure 3-9 ZYNQ 与 DDR3 连接示意图
+
+3.6.2 QSPI Flash
+    模块板载一片 256MBit 大小的 QSPI Flash，型号为 W25Q256FVEI，厂商为 Winbond，
+它使用 3.3V CMOS 电压标准。可以用于引导 SoC 系统启动，初始化 PS 并配置 PL 部分，
+以及系统 ARM 系统，即它可以作为系统的启动设备来存储系统的启动镜像。这些镜像主
+要包括 FPGA 的 bit 文件、ARM 的应用程序代码以及其它的用户数据文件。QSPI 连接到
+ZYNQ PS 下的 BANK500 MIO[1-6]。
+
+    QSPI 与 ZYNQ 硬件连接示意图如下图 Figure 3-10 所示
+
+
+
+
+                                    20 / 51
+ Mizar Z7 用户手册
+
+
+
+
+                                                                      QSPI Flash
+                                               QSPI_CS
+                                       MIO1                        CS W25Q256
+                                               QSPI_DQ0
+                                       MIO2
+                          Quad SPI 0
+                                                                   IO0
+
+                          Bank 500
+                                               QSPI_DQ1
+                                       MIO3                        IO1
+                                               QSPI_DQ2
+                                       MIO4                        IO2
+                                               QSPI_DQ2
+                                       MIO5                        IO3
+                                               QSPI_CLK
+                                       MIO6                        CLK
+
+
+
+
+                                  Figure 3-10 QPSI 与 ZYNQ 连接示意图
+
+    QSPI 与 ZYNQ 管脚连接分配表
+
+              Signal Name                     FPGA Pin            Pin Name
+
+               QSPI_CS                          A7              PS_MIO1_500
+
+               QSPI_CLK                         A5              PS_MIO6_500
+
+              QSPI_DQ0                          B8              PS_MIO2_500
+
+              QSPI_DQ1                          D6              PS_MIO3_500
+
+              QSPI_DQ2                          B7              PS_MIO4_500
+
+              QSPI_DQ3                          A6              PS_MIO5_500
+
+                                        Table 3-4 QSPI 信号管脚分配
+
+3.6.3 Wi-Fi
+    Mizar Z7 提供了 Wi-Fi&BLE 无线通信，Wi-Fi 接到 ZYNQ PS 的 SD/SDIO 1 接口上，BLE
+的 UART 信号接到 ZYNQ PL Bank35 IO 上，在系统开发过程中，可以通过 EMIO 接口，将
+BLE 连接到 ARM 下，无线模块支持：
+
+
+
+                                                     21 / 51
+ Mizar Z7 用户手册
+
+      Wi-Fi 802.11b/g/n
+      Bluetooth V4.0
+
+   板卡上提供两种天线，一种是陶瓷天线，一种是 IPEX 天线，默认使用陶瓷天线，用
+户可以通过焊接电容 C127,C128 来选择何种天线。
+
+   ZYNQ 与无线模块接口
+
+      6 个 WI-FI 的 SDIO 信号全部连接到 ZYNQ PS IO
+      2 个 BLE 的 UART 信号连到 ZYNQ PL IO
+      5 个控制信号连接到 ZYNQ
+       WIFI_HOST_WAKE
+       WIFI_REG_ON
+       BT_WAKE
+       BT_HOST_WAKE
+       BT_nRESET
+      PCM 接口没有连接，PCM 主要用来做蓝牙语音传输。
+
+   Wi-Fi 与 ZYNQ 硬件连接示意图如下图 Figure 3-11 所示
+
+
+
+
+                                22 / 51
+Mizar Z7 用户手册
+
+
+   ARM(PS)
+                                                                   Wi-Fi&BLE
+                                                                    AP6212
+                                   WIFI_REG_ON
+                         MIO8                                 WL_REG_ON
+                                   WIFI_SDIO_CLK
+
+         Bank 500
+          SDIO 1        MIO12                                 SDIO_DATA_CLK
+                                   WIFI_SDIO_CMD
+                        MIO11                                 SDIO_DATA_CMD
+                                   WIFI_SDIO_DATA[0..3]                                     ANT1
+                        MIO...                                SDIO_DATA[0..3]
+                                   WIFI_HOST_WAKE
+                         MIO9                                 WL_HOST_WAKE
+                                                                                     C127
+                                                                                                   J11
+
+                                                                                     C128
+                                   BT_FM_UART_TXD
+                       PIN:D18                                PIN: D18
+                                   BT_FM_UART_RXD
+                                                              PIN: M14
+            Bank 35
+
+
+
+
+                       PIN: E19
+                                   BT_WAKE
+                      PIN: M18                                PIN: K16
+                                   BT_HOST_WAKE               PIN: J16
+                      PIN: M17
+                                   BT_nRESET                  PIN: J15
+                       PIN: E18
+
+
+   FPGA(PL)
+
+
+                                  Figure 3-11 eMMC 与 ZYNQ 连接示意图
+
+  Wi-Fi 与 ZYNQ 管脚连接分配表
+
+        Signal Name                         FPGA Pin                            说明
+
+       WIFI_REG_ON                             D5                PS 侧，Wi-Fi 模块电源使能
+
+       WIFI_SDIO_CLK                           D9                PS 侧，SDIO 时钟信号
+
+       WIFI_SDIO_CMD                           C6                PS 侧，SDIO 命令信号
+
+      WIFI_SDIO_DATA0                          E9                PS 侧，SDIO 数据信号 0
+
+      WIFI_SDIO_DATA1                          E8                PS 侧，SDIO 数据信号 1
+
+      WIFI_SDIO_DATA2                          C5                PS 侧，SDIO 数据信号 2
+
+      WIFI_SDIO_DATA3                          C8                PS 侧，SDIO 数据信号 3
+
+      WIFI_HOST_WAKE                           B5                PS 侧，Wi-Fi 模块唤醒信号
+
+      BT_FM_UART_RXD                          E19                PL 侧，BT UART 接受信号
+
+
+
+                                                    23 / 51
+ Mizar Z7 用户手册
+
+
+       BT_FM_UART_TXD        D18             PL 侧，BT UART 发送信号
+
+        BT_HOST_WAKE         M17             PL 侧，BT 主站唤醒信号
+
+         BT_NRESET           E18             PL 侧，BT 复位信号
+
+          BT_WAKE            M18             PL 侧，BT 唤醒信号
+
+                        Table 3-5 Wi-Fi 信号管脚分配
+
+3.6.4 千兆以太网
+
+   MIZAR Z7 在 PS 接口上集成了一片 10/100/1000M 以太网 PHY 芯片，采用的是 Realtek
+公司的 RTL8211E，数字接口工作在 1.8V，以太网 PHY 芯片连接到 ZYNQ PS Ethernet0，对
+应的管脚在 Bank501 上，用户可以非常方便地使用它实现以太网的相关应用。
+
+   以太网 PHY 通过 RGMII 接口与 ZYNQ 的以太网 MAC 相连，同时 ZYNQ 可以通过 MDIO
+网口管理接口去配置 PHY 芯片的寄存器，芯片支持 MDI/MDIX 交叉自适应，MDI 收发信号
+则连接到 B2B 连接器 JM3 上，用户只需将这些信号连接 RJ45 连接器即可完成网口的设计，
+非常简单易用。
+
+   以太网 PHY RTL8211 与 ZYNQ 连接示意图如图 Figure 3-12 所示
+
+
+
+
+                                   24 / 51
+Mizar Z7 用户手册
+
+
+                                                     Ethernet PHY
+                                                       RTL8211
+                              PHY_TXCTL
+                                                   TXCTL
+
+
+
+
+                   Transmit
+                              PHY_TX_CLK
+                                                   TXC
+                              PHY_TXD[0..3]
+                                                   TXD[0..3]
+
+                              PHY_RXCTL                                  MDI/MDIX
+                                                   RXCTL        DP/M
+                              PHY_RX_CLK
+                                                   RXC
+                              PHY_RXD[0..3]                    LED0/1
+                                                   RXD[0..3]
+
+                              PHY_MDC
+                                                   MDC
+                              PHY_MDIO
+                                                   MDIO
+
+                                 PS_POR_B
+                                                   RESET
+
+
+
+                              Figure 3-12 以太网连接示意图
+
+  RTL8211 与 ZYNQ 管脚连接分配表
+
+  Signal Name   FPGA Pin              Pin Name                      说明
+
+   ETH_TXCK       A19               PS_MIO16_501           RGMII 发送时钟
+
+  ETH_TXD0        E14               PS_MIO17_501           RGMII 数据发送位 0
+
+  ETH_TXD1        B18               PS_MIO18_501           RGMII 数据发送位 1
+
+  ETH_TXD2        D10               PS_MIO19_501           RGMII 数据发送位 2
+
+  ETH_TXD3        A17               PS_MIO20_501           RGMII 数据发送位 3
+
+  ETH_TXCTL       F14               PS_MIO21_501           RGMII 发送控制信号，使能信号
+
+  ETH_RXCK        B17               PS_MIO22_501           RGMII 接受时钟
+
+  ETH_RXD0        D11               PS_MIO23_501           RGMII 数据接受位 0
+
+  ETH_RXD1        A16               PS_MIO24_501           RGMII 数据接受位 1
+
+
+
+
+                                        25 / 51
+ Mizar Z7 用户手册
+
+
+    ETH_RXD2       F15       PS_MIO25_501     RGMII 数据接受位 2
+
+    ETH_RXD3      A15        PS_MIO26_501     RGMII 数据接受位 3
+
+    ETH_RXCTL     D13        PS_MIO27_501     RGMII 接受有效信号
+
+    ETH_MDC       C10        PS_MIO52_501     管理接口时钟
+
+    ETH_MDIO      C11        PS_MIO53_501     管理接口数据
+
+                         Table 3-6 以太网管脚分配表
+
+3.6.5 USB 接口
+
+    MIZAR Z7 在 PS 接口上集成了一片 USB 2.0 ULPI 收发器芯片，采用的是 Microchip 公
+司的 USB3320，数字接口工作在 1.8V，USB PHY 芯片连接到 ZYNQ PS USB0，对应的管脚在
+Bank501 上，用户可以它拓展成 Device Mode, OTG Mode, Host Mode。
+
+    USB 收发器定义成 OTG 模式，可以工作在 Host 和 Slave 两种模式，当工作在 Host 模
+式，USB 需要向 USB 设备提供 5V 电源到 USB 接口上，用户可以通过开发板上 USB-Type A
+（J3）接口来接外设，此时需要把跳线帽 J5 短接来实现对外部从设备提供电源；当工作
+在 Slave 模式，可以通过开发板上 USB-micro（J4）接口来连接外部主设备，此时需要把 J5
+断开。
+
+    USB PHY USB3320 与 ZYNQ 连接示意图如图 Figure 3-13 所示
+
+
+
+
+                                26 / 51
+Mizar Z7 用户手册
+
+
+
+
+                                                        USB PHY
+                                                        USB3320
+
+                             OTG_DIR                                         USB_VBUS
+                                                   OTG_DIR          VBUS
+                             OTG_STP
+                                                   OTG_STP                   USB_OTG_P/N
+                             OTG_NXT                                DP/M
+                                                   OTG_NXT
+                             OTG_CLK                                         USB_OTG_CPEN
+                                                   OTG_CLK          CPEN
+                             OTG_DATA[0..7]
+                                                   OTG_DATA[0..7]             USB_OTG_ID
+                                                                      ID
+
+                             OTG_nRST
+                OTG RST
+
+
+
+
+                             Figure 3-13 USB 连接示意图
+
+  USB3320 与 ZYNQ 管脚连接分配表
+
+  Signal Name     FPGA Pin              Pin Name                       说明
+
+  OTG_NRST          D16             PS_MIO8_500          OTG reset, low active
+
+   OTG_CLK          A11             PS_MIO36_501         ULPI clock output
+
+  OTG_DATA0         A14             PS_MIO32_501         ULPI bi-directional Data0
+
+  OTG_DATA1         D15             PS_MIO33_501         ULPI bi-directional Data1
+
+  OTG_DATA2         A12             PS_MIO34_501         ULPI bi-directional Data2
+
+  OTG_DATA3          F12            PS_MIO35_501         ULPI bi-directional Data3
+
+  OTG_DATA4         C16             PS_MIO28_501         ULPI bi-directional Data4
+
+  OTG_DATA5         A10             PS_MIO37_501         ULPI bi-directional Data5
+
+  OTG_DATA6          E13            PS_MIO38_501         ULPI bi-directional Data6
+
+  OTG_DATA7         C18             PS_MIO39_501         ULPI bi-directional Data7
+
+
+
+                                        27 / 51
+ Mizar Z7 用户手册
+
+                                                                    Controls the direction of the data
+     OTG_DIR                  C13            PS_MIO29_501
+                                                                    bus
+     OTG_NXT                  E16            PS_MIO31_501           OTG NXT signal
+
+     OTG_STP                  C15            PS_MIO30_501           OTG STP signal
+
+                                     Table 3-7 USB 管脚分配表
+
+3.6.6 SD Card
+    MIZAR Z7 在 PS 接口上提供了一路 Micro SD 卡，Micro SD 卡可以用于存储 Zynq 芯片
+的 BOOT 程序，操作系统内核, 文件系统以及其它的用户数据文件。
+
+    Micro SD 卡槽连接到 ZYNQ PS SDIO0，对应的管脚在 Bank501 的 MIO[40-45]上，由于
+PS 的 Bank501 的 IO 电压是 1.8V，Micro SD Card 的 IO 电压是 3.3V 接口，因此在 SD 卡与
+ZYNQ 之间需要加一个 TXS02612 电平转换芯片。
+
+    PS SDIO 信号与 SD 卡槽连接示意图如图 Figure 3-14 所示
+
+
+
+                                    1.8V                     3.3V
+
+
+                                             TXS02612
+                      MIO43                                                      DAT1
+                      MIO42                                                      DAT0
+                                                                                 GND
+           Bank 501
+
+
+
+
+                                             Voltage Level
+            SDIO0
+
+
+
+
+                      MIO40                      Shift                           CLK
+                                                                                 VDD
+                      MIO41                                                      CMD
+                      MIO45                                                      DAT3
+                      MIO44                                                      DAT2
+
+
+
+
+                               Figure 3-14 PS MIO 与连接器连接示意图
+
+    SD 与 ZYNQ 管脚连接分配表
+
+           Signal Name                     FPGA Pin                     Pin Name
+
+                SD_CLK                       D14                      PS_MIO40_501
+
+
+
+
+                                                   28 / 51
+ Mizar Z7 用户手册
+
+
+          SD_CMD                            C17                     PS_MIO41_501
+
+          SD_DATA0                          E12                     PS_MIO42_501
+
+          SD_DATA1                          A9                      PS_MIO43_501
+
+          SD_DATA2                          F13                     PS_MIO44_501
+
+          SD_DATA3                          B15                     PS_MIO45_501
+
+                            Table 3-8 SD 信号与 ZYNQ 管脚连接分配表
+
+3.6.7 USB 串口
+
+   MIZAR Z7 在 PS 侧提供了一路 UART-to-USB 接口，即 USB 串口，用于 PS 的系统通信，
+使用的芯片是 Silicon Labs CP2102，USB 接口采用 Micro USB 接口，用户可以用一根 Micro
+USB 数据线连接到 PC 上实现通信。PS 的 UART1 接口分配到 Bank501 MIO[48-49]。
+
+   USB-UART 的数字 IO 电压是 3.3V 接口，PS 的 Bank501 的 IO 电压是 1.8V，因此在
+USB-UART 芯片与 ZYNQ 之间需要加一个 TXS0102 电平转换芯片。
+
+   PS UART 信号与 USB 连接器连接示意图如图 Figure 3-15 所示
+
+
+
+
+                                1.8V                   3.3V
+
+                                        TXS0102                TXS0102
+                                                               CP2102
+
+                            UART TX                           RXD
+                                                                            VBUS
+                    MIO48              A1         B1
+           MIO500
+
+
+
+
+                                                                     DP/M
+                            UART RX
+                    MIO49              A2         B2          TXD
+
+
+
+
+                                                                                   Micro USB
+
+
+
+
+                               Figure 3-15 UART 与 USB 连接示意图
+
+   UART 与 ZYNQ 管脚连接分配表
+
+
+                                                  29 / 51
+ Mizar Z7 用户手册
+
+
+         Signal Name            FPGA Pin                    Pin Name
+
+          UART_TX                 B12                     PS_MIO48_501
+
+          UART_RX                 C12                     PS_MIO49_501
+
+                      Table 3-9 UART 信号与 ZYNQ 管脚连接分配表
+
+3.6.8 用户按键
+
+   MIZAR Z7 在 PS 侧提供了两个用户按键（K2~K3），按键默认状态是上拉状态，即没
+有按下按键时，对应的 FPGA 芯片管脚输入信号为高电平；当按键按下后，对应的 FPGA
+的管脚输入信号为低电平。
+
+   PS KEY 与 ZYNQ 连接示意图如图 Figure 3-16 所示
+
+
+
+
+                            VCCO
+
+                 K2
+                                                  MIO0
+
+
+                 K3
+                                                  MIO47
+
+
+
+
+                        Figure 3-16 PS KEY 与 ZYNQ 连接示意图
+
+   PS KEY 与 ZYNQ 管脚连接分配表
+
+         Signal Name            FPGA Pin                    Pin Name
+
+          PS_KEY1                  E6                     PS_MIO40_500
+
+
+
+                                        30 / 51
+ Mizar Z7 用户手册
+
+
+           PS_KEY2                       B14                  PS_MIO47_501
+
+                        Table 3-10 PS KEY 与 ZYNQ 管脚连接分配表
+
+3.6.9 用户 LED
+
+    MIZAR Z7 在 PS 侧提供了两个用户 LED（D4~D5），当 FPGA 对应的管脚输出低电平
+时，LED 会发亮；输出高电平时，LED 会熄灭。
+
+    PS LED 与 ZYNQ 连接示意图如图 Figure 3-17 所示
+
+
+
+
+                                                         D4        D5
+
+                                      MIO50
+                             MIO501
+
+
+
+
+                                      MIO51
+
+
+
+
+                         Figure 3-17 PS LED 与 ZYNQ 连接示意图
+
+    PS LED 与 ZYNQ 管脚连接分配表
+
+          Signal Name                  FPGA Pin                 Pin Name
+
+           PS_LED1                       B13                  PS_MIO50_500
+
+           PS_LED2                       B9                   PS_MIO51_501
+
+
+
+
+                                               31 / 51
+ Mizar Z7 用户手册
+
+                   Table 3-11 PS LED 与 ZYNQ 管脚连接分配表
+
+3.7   PL 侧接口
+
+3.7.1 HDMI TX (HDMI1)
+      此 HDMI 亦可配置 HDMI 输入。
+
+      HDMI，全称为高清晰度多媒体视频输出接口。Mizar Z7 开发板上提供了一个高清
+HDMI 的视频接口，HDMI 接口为 Type-A 型， HDMI 的差分时钟和数据直接接到 ZYNQ 的
+PL 侧的 IO 口上，在 FPGA 内部实现 HMDI 信号的差分转并行再进行编解码，实现 DMI 数
+字视频输入和输出的传输解决方案，最高支持 1080P@60Hz 的输入和输出的功能。
+
+      HDMI 采用和 DVI 相同的传输原理，即 TMDS 标准，ZYNQ 中 PL 侧的 IO 结构是支持
+TMDS，可以用 FPGA 直接驱动 HDMI 信号或接受 HDMI 信号。同时，HDMI 的信号是可以
+支持 DVI 信号，用户可以用一个 HDMI 转 DVI 的适配器，无需修改程序，可以支持 DVI 接
+口的显示器。
+
+      HDMI 有 19 个引脚，包含了三对差分数据信号，一对差分时钟信号，五个地脚，一
+线制 CEC 信号总线，两线制的 DDC 信号总线，还包含 I2C 总线，一个热插拔监测 HPD 信
+号，5V 电源以及一个保留引脚。HDMI 的信号全部连接 Bank35 上。
+
+      HDMI 与 ZYNQ 连接示意图如图所示
+
+
+
+
+                                32 / 51
+Mizar Z7 用户手册
+
+
+
+
+                                     5V      5V_O
+                               EN        PDS
+                               CLK_P/N
+                      BANK35   DATA0_P/N
+                               DATA1_P/N
+                               DATA2_P/N
+                               I2C_SLC/SDA
+                               HPD
+
+
+
+
+                      Figure 3-18 ZYNQ 与 HDMI1 连接示意图
+
+  HDMI 与 ZYNQ 管脚连接分配表
+
+        Signal Name              FPGA Pin                   说明
+
+       HDMI1_CLK_N                 K18             HDMI TMDS 时钟
+
+       HDMI1_CLK_P                 K17             HDMI TMDS 时钟
+
+        HDMI1_D0_N                 G20             HDMI TMDS 数据
+
+        HDMI1_D0_P                 G19             HDMI TMDS 数据
+
+        HDMI1_D1_N                 F20             HDMI TMDS 数据
+
+        HDMI1_D1_P                 F19             HDMI TMDS 数据
+
+        HDMI1_D2_N                 D20             HDMI TMDS 数据
+
+        HDMI1_D2_P                 D19             HDMI TMDS 数据
+
+        HDMI1_HPD                  F16             HDMI 热插拔检测信号
+
+
+
+                                         33 / 51
+ Mizar Z7 用户手册
+
+
+         HDMI1_I2C_SCL            F17             HDMI I2C 总线时钟信号
+
+         HDMI1_I2C_SDA            M19             HDMI I2C 总线数据信号
+
+         HDMI1_OUT_EN             M20             HDMI 输出使能
+
+                         Table 3-12 HDMI1 信号与 ZYNQ 分配表
+
+3.7.2 HDMI RX(HDMI2)
+    此 HDMI 仅在 7020 版支持，它亦可配置 HDMI 输出。
+
+    和 HDMI TX 相比，两者电路完全一致，所以两个 HDMI 接口既可以配置成 HDMI 发
+送，又可以配置成 HDMI 接受，这是由于 HDMI 的信号是由 FPGA IO 模拟产生，FPGA 内部
+实现 HDMI 编解码功能，而 FPGA IO 包括时钟是双向 IO，可以配置成输入，也可以配置成
+输出，所以说两个 HMDI 接口即可以做成 HDMI 输入，亦可配置成 HDMI 输出。
+
+    此路 HDMI 连接到 ZYNQ Bank13， 由于 Bank13 在 7010 上管脚是 NC，所以此路 HDMI
+仅 7020 版本支持，7010 版不支持。
+
+    HDMI 与 ZYNQ 连接示意图如图所示
+
+
+
+
+                                        34 / 51
+Mizar Z7 用户手册
+
+
+
+
+                                     5V      5V_O
+                               EN        PDS
+                               CLK_P/N
+                      BANK35   DATA0_P/N
+                               DATA1_P/N
+                               DATA2_P/N
+                               I2C_SLC/SDA
+                               HPD
+
+
+
+
+                      Figure 3-19 ZYNQ 与 HDMI2 连接示意图
+
+  HDMI 与 ZYNQ 管脚连接分配表
+
+        Signal Name              FPGA Pin                  说明
+
+       HDMI2_CLK_P                 Y7             HDMI TMDS 时钟
+
+       HDMI2_CLK_N                 Y6             HDMI TMDS 时钟
+
+        HDMI2_D0_P                 T5             HDMI TMDS 数据
+
+        HDMI2_D0_N                 U5             HDMI TMDS 数据
+
+        HDMI2_D1_P                 U7             HDMI TMDS 数据
+
+        HDMI2_D1_N                 V7             HDMI TMDS 数据
+
+        HDMI2_D2_P                 V8             HDMI TMDS 数据
+
+        HDMI2_D2_N                 W8             HDMI TMDS 数据
+
+        HDMI2_HPD                  U8             HDMI 热插拔检测信号
+
+
+
+                                        35 / 51
+ Mizar Z7 用户手册
+
+
+          HDMI2_I2C_SCL            V6             HDMI I2C 总线时钟信号
+
+          HDMI2_I2C_SDA            W6             HDMI I2C 总线数据信号
+
+          HDMI2_OUT_EN             V5             HDMI 输出使能
+
+                          Table 3-13 HDMI2 信号与 ZYNQ 分配表
+
+3.7.3 MIPI CSI
+     Mizar Z7 上的 MIPI CSI 端口是一个 15 针、1 mm 间距的上接触 FPC 连接器，设计用于
+连接 MIPI 接口的摄像头。MIPI FPC 连接器引脚定义兼容树莓派摄像头，这些信号定义包
+括 MIPI CSI-2 总线、用于 Camera 配置的 I2C 总线，双向通用 IO 以及 3.3V 的供电。
+
+     MIPI CSI-2 总线连接到 ZYNQ PL IO 上。Xilinx 应用说明 XAPP894 D-PHY 解决方案中描
+述的准则遵循了这些准则，以便使用 Zynq 实现兼容的 D-PHY 接收器。该接口经过测试，
+可在每个通道上以高达 672 Mbps 的速度运行。根据 Zynq-7000 芯片规格，每个 Lane 的速
+度高达 950 Mbps。
+
+     MIPI CSI-2 接收器 IP 内核可从 Xilinx 获得，包括嵌入式 Linux 支持。它需要许可证才
+能使用，但也有可能免费从 Xilinx 获得评估许可证。
+
+     MIPI CSI 与 ZYNQ 连接示意图如图所示
+
+
+
+
+                                        36 / 51
+Mizar Z7 用户手册
+
+
+
+
+                      LP_CLK_P/N         MIPI_CSI_CLK_P/N
+                                     电阻
+                      LP_LANE0_P/N      MIPI_CSI_L0_P/N
+                                     网络
+             BANK35
+             BANK13
+                      LP_LANE1_P/N        MIPI_CSI_L1_P/N
+                        CAM_GPIO
+                        CAM_CLK
+
+
+                        CAM_SCL
+             BANK35
+
+
+
+
+                        CAM_SDA
+
+
+
+
+                           Figure 3-20 MIPI CSI 与 ZYNQ 连接示意图
+
+  MIPI CSI 与 ZYNQ 管脚连接分配表
+
+        Signal Name                   FPGA Pin                        说明
+
+         LP_CLK_P                        Y9             MIPI CLK
+
+         LP_CLK_N                        Y8             MIPI CLK
+
+        LP_LANE0_P                      Y12             MIPI Lane0 data
+
+        LP_LANE0_N                      Y13             MIPI Lane0 data
+
+        LP_LANE1_P                      V11             MIPI Lane1 data
+
+        LP_LANE1_N                      V10             MIPI Lane1 data
+
+         CAM_CLK                         U9             可做 GPIO，
+
+        CAM_GPIO                        H17             Default NC
+
+         CAM_SCL                        A20             I2C 时钟，和 EEPROM 共用
+
+         CAM_SDA                        E17             I2C 数据，和 EEPROM 共用
+
+
+
+
+                                              37 / 51
+ Mizar Z7 用户手册
+
+                        Table 3-14 MIPI CSI 与 ZYNQ 管脚连接分配表
+
+3.7.4 EEPROM
+    MIZAR Z7 在 PL 提供了一片 32Kb 的 EERPOM 芯片，型号为 24C32，32Kb (4K x 8)，
+EEPROM 应用很广泛，在嵌入设备里，可以存储设备的信息，包括型号，序列号，版本信
+息，网络地址等等。EERPOM 的接口采用的是 I2C，连接 PL Bank35 IO 上，用户可以通过
+I2C 的接口读写 EEPROM，无论是 PL 直接访问，或者 PS 通过 EMIO 访问都可以，用户可以
+根据的自己的实际应用去做选择。
+
+    EEPROM 与 ZYNQ PL 连接示意图如图所示
+
+
+
+
+                                     EEPROM_I2C_SCL
+                              V6
+                                                                 EEPRPOM
+                                                                   24C32
+                                     EEPROM_I2C_SDA
+                              W6
+
+
+
+
+                        Figure 3-21 EEPROM 与 ZYNQ PL 连接示意图
+
+    EEPROM 与 ZYNQ 管脚连接分配表
+
+          Signal Name              FPGA Pin                 说明
+
+        EEPROM_I2C_SCL               V6             I2C 总线时钟信号
+
+
+
+
+                                          38 / 51
+ Mizar Z7 用户手册
+
+
+       EEPROM_I2C_SDA           W6               I2C 总线数据信号
+
+                    Table 3-15 EEPROM 与 ZYNQ 管脚连接分配表
+
+3.7.5 用户按键
+
+   MIZAR Z7 在 PL 侧提供了四个用户按键（K4~K7），按键默认状态是上拉状态，即没
+有按下按键时，对应的 FPGA 芯片管脚输入信号为高电平；当按键按下后，对应的 FPGA
+的管脚输入信号为低电平。
+
+   PL KEY 与 ZYNQ 连接示意图如图所示
+
+
+
+                    VCC_3V3
+
+
+           K4
+                              PL_KEY1
+                                                  R19
+           K5
+                              PL_KEY2
+                                                  T19
+           K6
+                              PL_KEY3
+                                                  J15
+           K7
+                              PL_KEY4
+                                                  B19
+
+
+
+
+                       Figure 3-22 PL KEY 与 ZYNQ 连接示意图
+
+   PL KEY 与 ZYNQ 管脚连接分配表
+
+         Signal Name           FPGA Pin                  说明
+
+          PL_KEY1                R19                用户 KEY1，按下时为低
+
+          PL_KEY2                T19                用户 KEY2，按下时为低
+
+          PL_KEY3                J15                用户 KEY3，按下时为低
+
+
+
+                                       39 / 51
+ Mizar Z7 用户手册
+
+
+           PL_KEY4                   B19             用户 KEY4，按下时为低
+
+                         Table 3-16 PL KEY 与 ZYNQ 管脚连接分配表
+
+3.7.6 用户 LED
+
+    MIZAR Z7 在 PL 侧提供了四个用户 LED（D6~D9），当 FPGA 对应的管脚输出低电平
+时，LED 会发亮；输出高电平时，LED 会熄灭。
+
+    PL LED 与 ZYNQ 连接示意图如图 Figure 3-17 所示
+
+
+
+
+                                           D6        D7       D6     D7
+                               PL_LED1
+                         G14
+                               PL_LED2
+                BANK35
+
+
+
+
+                         C20
+                               PL_LED3
+                         B20
+                               PL_LED4
+                         H17
+
+
+
+
+                           Figure 3-23 PL LED 与 ZYNQ 连接示意图
+
+    PL LED 与 ZYNQ 管脚连接分配表
+
+          Signal Name              FPGA Pin                  说明
+
+           PL_LED1                   G14             用户 LED1，输出为低时亮
+
+           PL_LED2                   C20             用户 LED2，输出为低时亮
+
+           PL_LED3                   B20             用户 LED3，输出为低时亮
+
+
+
+
+                                           40 / 51
+ Mizar Z7 用户手册
+
+
+          PL_LED4             H17             用户 LED4，输出为低时亮
+
+                    Table 3-17 PL LED 与 ZYNQ 管脚连接分配表
+
+3.7.7 GPIO 扩展口
+
+   Mizar Z7 提供 2 组 2x20 40Pin GPIO 扩展口，间距 2.54mm，位号为 JP1，JP2。每组
+扩展口包含一个+5V（VCC_5V），一个 3.3V(VCC_3V3)，2 个 GND，36 个用户 GPIO。用户
+可以通过扩展口来实现自己的功能或接口扩展。也可以选择微相出品的扩展子卡来实现
+自己的应用，目前微相推出: ADDA 模块，液晶屏模块，千兆以太网模块， 500W 双目视
+觉摄像头模块。JP1，JP2 的 IO 在 PCB 设计上使用了差分走线，阻抗为 100 欧姆。
+
+扩展口 JP1
+   扩展口 JP1 与 ZYNQ 连接示意图
+
+
+
+
+                                    41 / 51
+Mizar Z7 用户手册
+
+
+
+                                                     JP1
+
+
+
+
+                                  GPIO1_[0..17]P/N
+                       BANK34
+
+                                  36个IO, 电压可调
+
+
+
+
+                Figure 3-24 扩展口 JP1 与 ZYNQ 连接示意图
+
+  扩展口 JP1 原理图如下图所示
+
+
+
+
+                                42 / 51
+Mizar Z7 用户手册
+
+
+
+
+                          Figure 3-25 扩展口 JP1 原理图
+
+  扩展口 JP1 与 ZYNQ 管脚连接分配表
+
+   JP1 Pin No.   Signal Name   FPGA Pin No.             说明
+
+       1          GPIO1_0P         N18        JP1 GPIO1_0P，电压可调
+
+       2         GPIO1_0N          P19        JP1 GPIO1_0N，电压可调
+
+       3          GPIO1_1P         N17        JP1 GPIO1_1P，电压可调
+
+       4         GPIO1_1N          P18        JP1 GPIO1_1N，电压可调
+
+       5          GPIO1_2P         N20        JP1 GPIO1_2P，电压可调
+
+       6         GPIO1_2N          P20        JP1 GPIO1_2N，电压可调
+
+       7          GPIO1_3P         T17        JP1 GPIO1_3P，电压可调
+
+       8         GPIO1_3N          R18        JP1 GPIO1_3N，电压可调
+
+       9          GPIO1_4P         T20        JP1 GPIO1_4P，电压可调
+
+       10        GPIO1_4N          U20        JP1 GPIO1_4N，电压可调
+
+
+
+
+                                   43 / 51
+Mizar Z7 用户手册
+
+
+      11         VCC_5V      -        电源 5V
+
+      12          GND        -        地
+
+      13        GPIO1_5P    V20       JP1 GPIO1_5P，电压可调
+
+      14        GPIO1_5N    W20       JP1 GPIO1_5N，电压可调
+
+      15        GPIO1_6P    Y18       JP1 GPIO1_6P，电压可调
+
+      16        GPIO1_6N    Y19       JP1 GPIO1_6N，电压可调
+
+      17        GPIO1_7P    Y16       JP1 GPIO1_7P，电压可调
+
+      18        GPIO1_7N    Y17       JP1 GPIO1_7N，电压可调
+
+      19        GPIO1_8P    W18       JP1 GPIO1_8P，电压可调
+
+      20        GPIO1_8N    W19       JP1 GPIO1_8N，电压可调
+
+      21        GPIO1_9P    U18       JP1 GPIO1_9P，电压可调
+
+      22        GPIO1_9N    U19       JP1 GPIO1_9N，电压可调
+
+      23        GPIO1_10P   V16       JP1 GPIO1_10P，电压可调
+
+      24        GPIO1_10N   W16       JP1 GPIO1_10N，电压可调
+
+      25        GPIO1_11P   V15       JP1 GPIO1_11P，电压可调
+
+      26        GPIO1_11N   W15       JP1 GPIO1_11N，电压可调
+
+      27        GPIO1_12P   W14       JP1 GPIO1_12P，电压可调
+
+      28        GPIO1_12N   Y14       JP1 GPIO1_12N，电压可调
+
+      29        VCC_3V3      -        电源 3.3V
+
+      30          GND        -        地
+
+      31        GPIO1_13P   U14       JP1 GPIO1_13P，电压可调
+
+      32        GPIO1_13N   U15       JP1 GPIO1_13N，电压可调
+
+      33        GPIO1_14P   U13       JP1 GPIO1_14P，电压可调
+
+      34        GPIO1_14N   V13       JP1 GPIO1_14N，电压可调
+
+
+                            44 / 51
+ Mizar Z7 用户手册
+
+
+       35        GPIO1_15P            V12       JP1 GPIO1_15P，电压可调
+
+       36        GPIO1_15N            W13       JP1 GPIO1_15N，电压可调
+
+       37        GPIO1_16P            T12       JP1 GPIO1_16P，电压可调
+
+       38        GPIO1_16N            U12       JP1 GPIO1_16N，电压可调
+
+       39        GPIO1_17P            T11       JP1 GPIO1_17P，电压可调
+
+       40        GPIO1_17N            T10       JP1 GPIO1_17N，电压可调
+
+                 Table 3-18 扩展口 JP1 与 ZYNQ 管脚连接分配表
+
+扩展口 JP2
+   扩展口 JP2 与 ZYNQ 连接示意图
+
+
+
+                                                                     JP2
+                             BANK35
+
+
+
+
+                                        GPIO2_[0..11]P/N
+                                        24个IO, 电压3.3V
+                             BANK34
+
+
+
+
+                                        GPIO2_[12..17]P/N
+                                        12个IO, 电压可调
+
+
+
+
+                   Figure 3-26 扩展口 JP1 与 ZYNQ 连接示意图
+
+
+
+
+                                      45 / 51
+Mizar Z7 用户手册
+
+
+
+
+                          Figure 3-27 扩展口 JP1 原理图
+
+  扩展口 JP2 与 ZYNQ 管脚连接分配表
+
+   JP1 Pin No.   Signal Name   FPGA Pin No.               说明
+
+       1          GPIO2_0P         J18        JP2 GPIO2_0P，电压 3.3V
+
+       2         GPIO2_0N          H18        JP2 GPIO2_0N，电压 3.3V
+
+       3          GPIO2_1P         G17        JP2 GPIO2_1P，电压 3.3V
+
+       4         GPIO2_1N          G18        JP2 GPIO2_1N，电压 3.3V
+
+       5          GPIO2_2P         K14        JP2 GPIO2_2P，电压 3.3V
+
+       6         GPIO2_2N          J14        JP2 GPIO2_2N，电压 3.3V
+
+       7          GPIO2_3P         H15        JP2 GPIO2_3P，电压 3.3V
+
+       8         GPIO2_3N          G15        JP2 GPIO2_3N，电压 3.3V
+
+       9          GPIO2_4P         J20        JP2 GPIO2_4P，电压 3.3V
+
+       10        GPIO2_4N          H20        JP2 GPIO2_4N，电压 3.3V
+
+
+
+
+                                   46 / 51
+Mizar Z7 用户手册
+
+
+      11         VCC_5V               电源 5V
+
+      12          GND                 地
+
+      13        GPIO2_5P    L14       JP2 GPIO2_5P，电压 3.3V
+
+      14        GPIO2_5N    L15       JP2 GPIO2_5N，电压 3.3V
+
+      15        GPIO2_6P    K19       JP2 GPIO2_6P，电压 3.3V
+
+      16        GPIO2_6N    J19       JP2 GPIO2_6N，电压 3.3V
+
+      17        GPIO2_7P    K16       JP2 GPIO2_7P，电压 3.3V
+
+      18        GPIO2_7N    J16       JP2 GPIO2_7N，电压 3.3V
+
+      19        GPIO2_8P    L19       JP2 GPIO2_8P，电压 3.3V
+
+      20        GPIO2_8N    L20       JP2 GPIO2_8N，电压 3.3V
+
+      21        GPIO2_9P    L16       JP2 GPIO2_9P，电压 3.3V
+
+      22        GPIO2_9N    L17       JP2 GPIO2_9N，电压 3.3V
+
+      23        GPIO2_10P   M14       JP2 GPIO2_10P，电压 3.3V
+
+      24        GPIO2_10N   M15       JP2 GPIO2_10N，电压 3.3V
+
+      25        GPIO2_11P   N15       JP2 GPIO2_11P，电压 3.3V
+
+      26        GPIO2_11N   N16       JP2 GPIO2_11N，电压 3.3V
+
+      27        GPIO2_12P   P15       JP2 GPIO2_12P，电压可调
+
+      28        GPIO2_12N   P16       JP2 GPIO2_12N，电压可调
+
+      29        VCC_3V3               电源 3.3V
+
+      30          GND                 地
+
+      31        GPIO2_13P   R16       JP2 GPIO2_13P，电压可调
+
+      32        GPIO2_13N   R17       JP2 GPIO2_13N，电压可调
+
+      33        GPIO2_14P   V17       JP2 GPIO2_14P，电压可调
+
+      34        GPIO2_14N   V18       JP2 GPIO2_14N，电压可调
+
+
+                            47 / 51
+ Mizar Z7 用户手册
+
+
+        35          GPIO2_15P          T16       JP2 GPIO2_15P，电压可调
+
+        36          GPIO2_15N          U17       JP2 GPIO2_15N，电压可调
+
+        37          GPIO2_16P          T14       JP2 GPIO2_16P，电压可调
+
+        38          GPIO2_16N          T15       JP2 GPIO2_16N，电压可调
+
+        39          GPIO2_17P          P14       JP2 GPIO2_17P，电压可调
+
+        40          GPIO2_17N          R14       JP2 GPIO2_17N，电压可调
+
+                    Table 3-19 扩展口 JP2 与 ZYNQ 管脚连接分配表
+
+3.7.8 GPIO 电压调整
+
+     扩展口中 JP1 的全部 IO 和 JP2 中 12 个 IO，共 48 个 IO 的电压可调，这些 IO 在 Mizar
+Z7 出厂默认配置成 3.3V，用户如想调整这些 IO 的电压，可以通过更换电阻来调整 IO 电
+压。
+
+     通过将 0 欧姆电阻选择贴装到 R208,R209,R210 上，来更改 VCCIO34 的电压，即可调
+整 IO 的电压，注意 R208,R209,R210 只能贴一个。
+
+
+
+
+  出厂默认：贴装 R208
+      贴R208 : 3.3V
+      贴R209 : 2.5V
+      贴R210 : 1.8V
+R208,R209,R210只能贴一个
+
+
+
+
+                                Figure 3-28 IO 电压调整图
+
+     调整 IO 电压与电阻贴装对应表
+
+             电阻贴装               BANK34 电压                IO 电压
+
+
+
+
+                                       48 / 51
+ Mizar Z7 用户手册
+
+
+           R208              3.3V             3.3V（默认状态）
+
+           R209              2.5V             2.5V
+
+           R210              1.8V             1.8V
+
+       更改 R205 电阻，
+                        0.6*(1+R205/10k)      所调电压值范围必须是 1.2V~3.3V
+         R208 短接
+
+                     Table 3-20 调整 IO 电压与电阻贴装对应表
+
+3.8   电源
+
+      MIZAR Z7 电源输入是直流 5V，使用其它规格的电源可能会损坏开发板。模块上电后，
+按顺序级联，以 1.0V->1.8V->1.5V->3.3V 的顺序完成上电过程。3.3V 最后上电，同时提供
+系统电源状态 PG 信号。
+
+
+
+
+                                    49 / 51
+Mizar Z7 用户手册
+
+
+
+
+          DC/DC 3A Max
+                                                  VDD_1V0
+            5V->1.0V
+
+
+          DC/DC 3A Max
+                                                  VDD_1V8
+            5V->1.8V
+
+
+          DC/DC 3A Max
+                                                  VDD_1V5
+            5V->1.5V
+                              DDR VTT/VREF
+                                                  VTT & VREF
+                               1.5V->0.75V
+
+          DC/DC 3A Max
+                                                  VDD_3V3
+            5V->3.3V
+
+
+          DC/DC 3A Max
+          5V->VCCIO_Adj                           VCCIO34
+        3.3 or 2.5V or 1.8V
+                      Figure 3-29 MIZAR Z7 电源结构
+
+
+
+
+                                50 / 51
+

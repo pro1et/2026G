@@ -1,0 +1,17 @@
+HMI BRAM COE generation summary
+ADC sample rate: 32000000 Hz
+Signal frequency: 10000 Hz
+Signal Vpp: 100.000000 mV
+Signal peak: 50.000000 mV
+Vrms from header: 35.355339059 mV
+Vrms squared raw: 1250
+Time samples: 32768
+Time Port A words used: 16388 of 32768
+FFT sample rate after decimation: 2000000 Hz
+FFT size: 4096
+FFT bin width: 488.281250000 Hz
+Spectrum points: 1024
+Highest stored frequency: 499511.718750000 Hz
+Spectrum Port A words used: 520 of 1024
+Time COE: E:\FPGA_PJ\2026G\fpga\src\ip\hmi_bram\time_bram_10khz_100mvpp.coe
+Spectrum COE: E:\FPGA_PJ\2026G\fpga\src\ip\hmi_bram\spectrum_bram_10khz_100mvpp.coe

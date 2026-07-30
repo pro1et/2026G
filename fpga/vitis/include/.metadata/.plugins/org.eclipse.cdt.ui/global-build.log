@@ -1,0 +1,31 @@
+Nothing to build in platform 'draw_test2'
+
+21:38:36 **** Incremental Build of configuration Debug for project draw_test2_1 ****
+make all 
+make --no-print-directory pre-build
+a9-linaro-pre-build-step
+' '
+make --no-print-directory main-build
+'Building file: ../src/hmi_measure_app.c'
+'Invoking: ARM v7 gcc compiler'
+arm-none-eabi-gcc -Wall -O0 -g3 -c -fmessage-length=0 -MT"src/hmi_measure_app.o" -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -IE:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/sw/draw_test2/standalone_domain/bspinclude/include -MMD -MP -MF"src/hmi_measure_app.d" -MT"src/hmi_measure_app.o" -o "src/hmi_measure_app.o" "../src/hmi_measure_app.c"
+'Finished building: ../src/hmi_measure_app.c'
+' '
+'Building target: draw_test2_1.elf'
+'Invoking: ARM v7 gcc linker'
+arm-none-eabi-gcc -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -Wl,-build-id=none -specs=Xilinx.spec -Wl,-T -Wl,../src/lscript.ld -LE:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/sw/draw_test2/standalone_domain/bsplib/lib -o "draw_test2_1.elf"  ./src/helloworld.o ./src/hmi_measure_app.o ./src/platform.o   -Wl,--start-group,-lxil,-lgcc,-lc,--end-group
+'Finished building target: draw_test2_1.elf'
+' '
+'Invoking: ARM v7 Print Size'
+arm-none-eabi-size draw_test2_1.elf  |tee "draw_test2_1.elf.size"
+   text	   data	    bss	    dec	    hex	filename
+  64283	   2564	  22784	  89631	  15e1f	draw_test2_1.elf
+'Finished building: draw_test2_1.elf.size'
+' '
+21:38:37 **** Incremental Build of configuration Debug for project draw_test2_1_system ****
+make all 
+Generating bif file for the system project
+generate_system_bif.bat 58246 E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/draw_test2.xpfm standalone_domain E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/system.bif
+sdcard_gen --xpfm E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/draw_test2.xpfm --sys_config draw_test2 --bif E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/system.bif --bitstream E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/_ide/bitstream/draw_test2.bit --elf E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/Debug/draw_test2_1.elf,ps7_cortexa9_0
+creating BOOT.BIN using E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/_ide/bitstream/draw_test2.bit
+Running E:/Xilinx_2/Vitis/2022.2/bin/bootgen  -image E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/sd_card_temp/boot.bif -w -o i BOOT.BIN

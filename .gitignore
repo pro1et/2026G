@@ -1,0 +1,13 @@
+# Xilinx/Vivado generated state
+**/.Xil/
+**/.xil/
+.gen/
+.srcs/
+**/*.gen/
+**/*.srcs/
+
+# Local temporary files
+tmp/
+
+# Vivado working project and generated outputs
+fpga/work/

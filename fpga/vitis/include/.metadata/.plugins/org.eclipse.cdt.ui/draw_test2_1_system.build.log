@@ -1,0 +1,10 @@
+21:38:37 **** Incremental Build of configuration Debug for project draw_test2_1_system ****
+make all 
+Generating bif file for the system project
+generate_system_bif.bat 58246 E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/draw_test2.xpfm standalone_domain E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/system.bif
+sdcard_gen --xpfm E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2/export/draw_test2/draw_test2.xpfm --sys_config draw_test2 --bif E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/system.bif --bitstream E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/_ide/bitstream/draw_test2.bit --elf E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/Debug/draw_test2_1.elf,ps7_cortexa9_0
+creating BOOT.BIN using E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1/_ide/bitstream/draw_test2.bit
+Running E:/Xilinx_2/Vitis/2022.2/bin/bootgen  -image E:/FPGA_PJ/2026G/fpga/vitis/include/draw_test2_1_system/Debug/sd_card_temp/boot.bif -w -o i BOOT.BIN
+
+21:38:43 Build Finished (took 5s.916ms)
+
