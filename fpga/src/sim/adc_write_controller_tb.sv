@@ -20,10 +20,10 @@
 //   避免与上升沿采样产生竞争。
 //
 // 输入格式：
-//   两路输入使用 16 位有符号二进制补码，包含正数、负数、零和符号边界。
+//   输入使用 16 位有符号二进制补码，包含正数、负数、零和符号边界。
 //
 // 输出格式：
-//   自动检查 FIFO 打包顺序、写次数、状态电平、事件脉宽和错误恢复。
+//   自动检查 FIFO 数据位模式、写次数、状态电平、事件脉宽和错误恢复。
 //
 // 握手时序：
 //   启动、消费和清错激励均按单周期脉冲产生。
@@ -51,12 +51,11 @@ module adc_write_controller_tb;
     logic                         frame_consumed;
     logic                         clear_error;
     logic                         fifo_ready;
-    logic signed [DATA_WIDTH-1:0] data_a;
-    logic signed [DATA_WIDTH-1:0] data_b;
+    logic signed [DATA_WIDTH-1:0] data_in;
     logic                         in_valid;
     logic                         fifo_full;
     logic                         fifo_wr_rst_busy;
-    logic [(2*DATA_WIDTH)-1:0]     fifo_din;
+    logic [DATA_WIDTH-1:0]         fifo_din;
     logic                         fifo_wr_en;
     logic                         capture_busy;
     logic                         frame_pending;
@@ -68,12 +67,11 @@ module adc_write_controller_tb;
     logic                         edge_consumed;
     logic                         edge_clear_error;
     logic                         edge_fifo_ready;
-    logic signed [DATA_WIDTH-1:0] edge_data_a;
-    logic signed [DATA_WIDTH-1:0] edge_data_b;
+    logic signed [DATA_WIDTH-1:0] edge_data_in;
     logic                         edge_in_valid;
     logic                         edge_fifo_full;
     logic                         edge_fifo_wr_rst_busy;
-    logic [(2*DATA_WIDTH)-1:0]     edge_fifo_din;
+    logic [DATA_WIDTH-1:0]         edge_fifo_din;
     logic                         edge_fifo_wr_en;
     logic                         edge_capture_busy;
     logic                         edge_frame_pending;
@@ -92,8 +90,7 @@ module adc_write_controller_tb;
         .frame_consumed   (frame_consumed),
         .clear_error      (clear_error),
         .fifo_ready       (fifo_ready),
-        .data_a           (data_a),
-        .data_b           (data_b),
+        .data_in          (data_in),
         .in_valid         (in_valid),
         .fifo_full        (fifo_full),
         .fifo_wr_rst_busy (fifo_wr_rst_busy),
@@ -115,8 +112,7 @@ module adc_write_controller_tb;
         .frame_consumed   (edge_consumed),
         .clear_error      (edge_clear_error),
         .fifo_ready       (edge_fifo_ready),
-        .data_a           (edge_data_a),
-        .data_b           (edge_data_b),
+        .data_in          (edge_data_in),
         .in_valid         (edge_in_valid),
         .fifo_full        (edge_fifo_full),
         .fifo_wr_rst_busy (edge_fifo_wr_rst_busy),
@@ -128,15 +124,15 @@ module adc_write_controller_tb;
         .overflow_error   (edge_overflow_error)
     );
 
-    // 每次真正写入时检查双通道位模式未被符号扩展或交换。
+    // 每次真正写入时检查 16 位补码位模式保持不变。
     always @(posedge clk) begin
         if (rst) begin
             write_total <= 0;
         end else if (fifo_wr_en) begin
-            assert (fifo_din === {data_a, data_b})
+            assert (fifo_din === data_in)
                 else $fatal(1,
-                    "FIFO 打包错误：time=%0t actual=%h expected=%h",
-                    $time, fifo_din, {data_a, data_b});
+                    "FIFO 数据映射错误：time=%0t actual=%h expected=%h",
+                    $time, fifo_din, data_in);
             write_total <= write_total + 1;
         end
     end
@@ -149,8 +145,7 @@ module adc_write_controller_tb;
             frame_consumed   = 1'b0;
             clear_error      = 1'b0;
             fifo_ready       = 1'b1;
-            data_a           = '0;
-            data_b           = '0;
+            data_in          = '0;
             in_valid         = 1'b0;
             fifo_full        = 1'b0;
             fifo_wr_rst_busy = 1'b0;
@@ -179,16 +174,14 @@ module adc_write_controller_tb;
     endtask
 
     task automatic send_sample(
-        input logic signed [DATA_WIDTH-1:0] sample_a,
-        input logic signed [DATA_WIDTH-1:0] sample_b,
+        input logic signed [DATA_WIDTH-1:0] sample,
         input logic                         expect_last
     );
         int unsigned writes_before;
         begin
             writes_before = write_total;
             @(negedge clk);
-            data_a   = sample_a;
-            data_b   = sample_b;
+            data_in  = sample;
             in_valid = 1'b1;
             @(posedge clk);
             #1;
@@ -222,8 +215,7 @@ module adc_write_controller_tb;
         frame_consumed   = 1'b0;
         clear_error      = 1'b0;
         fifo_ready       = 1'b1;
-        data_a           = '0;
-        data_b           = '0;
+        data_in          = '0;
         in_valid         = 1'b0;
         fifo_full        = 1'b0;
         fifo_wr_rst_busy = 1'b0;
@@ -233,8 +225,7 @@ module adc_write_controller_tb;
         edge_consumed         = 1'b0;
         edge_clear_error      = 1'b0;
         edge_fifo_ready       = 1'b1;
-        edge_data_a           = '0;
-        edge_data_b           = '0;
+        edge_data_in          = '0;
         edge_in_valid         = 1'b0;
         edge_fifo_full        = 1'b0;
         edge_fifo_wr_rst_busy = 1'b0;
@@ -242,8 +233,8 @@ module adc_write_controller_tb;
         // 正常帧：包含间断 valid、符号边界和采集中重复启动。
         reset_main();
         pulse_start();
-        send_sample(16'sh8000,  16'sh7fff, 1'b0);
-        send_sample(-16'sd1,    16'sd0,    1'b0);
+        send_sample(16'sh8000,  1'b0);
+        send_sample(-16'sd1,    1'b0);
         insert_invalid_cycle();
 
         @(negedge clk);
@@ -255,12 +246,12 @@ module adc_write_controller_tb;
         @(negedge clk);
         capture_start = 1'b0;
 
-        send_sample(16'sd123,   -16'sd456, 1'b0);
-        send_sample(16'sd32767, 16'sh8000, 1'b0);
-        send_sample(-16'sd17,    16'sd19,   1'b0);
-        send_sample(16'sd20,     16'sd21,   1'b0);
-        send_sample(16'sd22,     16'sd23,   1'b0);
-        send_sample(16'sd24,     16'sd25,   1'b1);
+        send_sample(16'sd0,      1'b0);
+        send_sample(16'sd32767,  1'b0);
+        send_sample(-16'sd17,    1'b0);
+        send_sample(16'sd20,     1'b0);
+        send_sample(16'sd22,     1'b0);
+        send_sample(16'sd24,     1'b1);
         #1;
         assert (write_total == TEST_FRAME_LENGTH && frame_pending && !capture_busy)
             else $fatal(1, "正常帧结束状态或写入数量错误，time=%0t", $time);
@@ -285,10 +276,9 @@ module adc_write_controller_tb;
         // 有效样点遇到 FIFO 满：禁止该拍写入并锁存错误。
         reset_main();
         pulse_start();
-        send_sample(16'sd1, 16'sd2, 1'b0);
+        send_sample(16'sd1, 1'b0);
         @(negedge clk);
-        data_a    = 16'sd3;
-        data_b    = 16'sd4;
+        data_in   = 16'sd3;
         in_valid  = 1'b1;
         fifo_full = 1'b1;
         @(posedge clk);
@@ -316,7 +306,7 @@ module adc_write_controller_tb;
 
         // 采集中 fifo_ready 撤销会使已写入半帧不再可信，必须锁存错误。
         pulse_start();
-        send_sample(16'sd5, 16'sd6, 1'b0);
+        send_sample(16'sd5, 1'b0);
         @(negedge clk);
         fifo_ready = 1'b0;
         @(posedge clk);
@@ -372,14 +362,13 @@ module adc_write_controller_tb;
             else $fatal(1, "单点帧实例启动失败，time=%0t", $time);
         @(negedge clk);
         edge_start    = 1'b0;
-        edge_data_a   = 16'sh8000;
-        edge_data_b   = 16'sd32767;
+        edge_data_in  = 16'sh8000;
         edge_in_valid = 1'b1;
         @(posedge clk);
         #1;
         assert (edge_frame_done_event && edge_frame_pending
                 && !edge_capture_busy
-                && edge_fifo_din === {edge_data_a, edge_data_b})
+                && edge_fifo_din === edge_data_in)
             else $fatal(1, "单点帧最后一拍处理错误，time=%0t", $time);
         @(negedge clk);
         edge_in_valid = 1'b0;

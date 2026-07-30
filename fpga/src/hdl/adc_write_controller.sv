@@ -5,13 +5,13 @@
 // 模块名称：adc_write_controller
 //
 // 主要功能：
-//   将同一采样时刻的两路有符号 ADC 样点原子打包，并按固定长度帧写入异步 FIFO
-//   的写端。本模块负责写入判定、帧内计数、完成通知和帧完整性错误锁存；不负责
+//   将单路有符号 ADC 样点按固定长度帧写入 16 位异步 FIFO 的写端。本模块负责
+//   写入判定、帧内计数、完成通知和帧完整性错误锁存；不负责
 //   ADC 码制转换、FIFO 读控制、FIFO 清空或跨时钟域同步。
 //
 // 使用方法：
 //   1. 将 clk、rst 连接到 ADC 采样模块与异步 FIFO 写端所在的同一时钟域。
-//   2. 将 data_a、data_b 和 in_valid 连接到 ADC 采集/格式转换模块。
+//   2. 将 data_in 和 in_valid 连接到 ADC 采集/格式转换模块的单路输出。
 //   3. 将 fifo_din、fifo_wr_en 连接到异步 FIFO 写端，并接入写侧状态信号。
 //   4. FIFO 空且复位完成后拉高 fifo_ready，再用单周期 capture_start 启动一帧。
 //   5. 将 frame_done_event、frame_consumed 的 CDC 握手放在本模块外部。
@@ -23,8 +23,8 @@
 //   frame_consumed       <- 读侧完成事件经 CDC 后形成的本时钟域单周期脉冲
 //   clear_error          <- 系统错误恢复控制逻辑
 //   fifo_ready           <- 系统确认 FIFO 为空且写端已完成复位的本时钟域状态
-//   data_a/data_b        <- ADC 采集/格式转换模块的两路同步样点
-//   in_valid             <- ADC 采集/格式转换模块的双通道样点有效信号
+//   data_in              <- ADC 采集/格式转换模块的单路有符号样点
+//   in_valid             <- ADC 采集/格式转换模块的样点有效信号
 //   fifo_full            <- 异步 FIFO 写端 full
 //   fifo_wr_rst_busy     <- 异步 FIFO 写端 wr_rst_busy
 //   fifo_din/fifo_wr_en  -> 异步 FIFO 写端 din/wr_en
@@ -35,13 +35,12 @@
 //   rst 为高电平有效同步复位。复位上升沿后写使能、状态和错误输出均无效。
 //
 // 输入格式：
-//   data_a、data_b 均为 DATA_WIDTH 位有符号二进制补码整数。默认 DATA_WIDTH=16，
-//   数值范围为 -32768～32767；本模块不缩放、不舍入、不饱和，也不改变位模式。
+//   data_in 为 DATA_WIDTH 位有符号二进制补码整数。默认 DATA_WIDTH=16，数值范围
+//   为 -32768～32767；本模块不缩放、不舍入、不饱和，也不改变位模式。
 //
 // 输出格式：
-//   fifo_din 是无整体符号含义的双通道打包字。高 DATA_WIDTH 位为 data_a 的补码
-//   位模式，低 DATA_WIDTH 位为 data_b 的补码位模式。FRAME_LENGTH 表示每通道
-//   的样点数，因此每帧产生恰好 FRAME_LENGTH 个 FIFO 写字。
+//   fifo_din 与 data_in 等宽并保持其二进制补码位模式。FRAME_LENGTH 表示每帧
+//   样点数，因此每帧产生恰好 FRAME_LENGTH 个 FIFO 写字。
 //
 // 握手时序：
 //   capture_start 仅在空闲且 FIFO 可用时接受；接受后的下一周期可首次写入。
@@ -51,7 +50,8 @@
 //
 // 参数说明：
 //   DATA_WIDTH 为单通道样点位宽，必须大于 0，默认 16 位。
-//   FRAME_LENGTH 为每帧每通道样点数，必须大于 0，默认 65536 点。
+//   FRAME_LENGTH 为每帧样点数，必须大于 0，默认 65536 点。当前 FWFT FIFO 的
+//   实际可写深度为 65537，可以完整保存一帧并保留一个存储位置的容量余量。
 //
 // 错误行为：
 //   采集中若有效样点遇到 fifo_full，或 FIFO 写端复位忙/失去 ready，则当前帧
@@ -60,13 +60,14 @@
 //
 // 使用限制：
 //   上游不能被反压；本模块通过报错而不是暂停来处理会导致丢样的 FIFO 阻塞。
-//   两路数据必须与同一个 in_valid 对齐并在有效写入沿满足建立/保持时间。
-//   峰值吞吐率为每个 clk 周期一组双通道样点，数据通路无额外寄存延迟。
+//   data_in 必须与 in_valid 对齐并在有效写入沿满足建立/保持时间。若要同时保存
+//   两路 ADC，必须使用两个本模块/两个 16 位 FIFO，或改用一个 32 位 FIFO。
+//   峰值吞吐率为每个 clk 周期一个样点，数据通路无额外寄存延迟。
 // ============================================================================
 
 module adc_write_controller #(
     parameter int unsigned DATA_WIDTH   = 16,    // 单通道有符号样点位宽，单位为位，必须大于 0
-    parameter int unsigned FRAME_LENGTH = 65536  // 每帧每通道样点数，单位为点，必须大于 0
+    parameter int unsigned FRAME_LENGTH = 65536  // 每帧样点数，单位为点，必须大于 0且不超过 FIFO 实际可写深度
 ) (
     input  wire logic                     clk,               // ADC/FIFO 写时钟，所有端口均属于此时钟域
     input  wire logic                     rst,               // 高电平有效同步复位
@@ -76,14 +77,13 @@ module adc_write_controller #(
     input  wire logic                     clear_error,       // 错误清除请求，高电平可保持，仅错误状态下处理
     input  wire logic                     fifo_ready,        // FIFO 为空且复位完成的状态，采集期间必须持续为高
 
-    input  wire logic signed [DATA_WIDTH-1:0] data_a,        // 通道 A 有符号二进制补码样点，in_valid 为高时有效
-    input  wire logic signed [DATA_WIDTH-1:0] data_b,        // 通道 B 有符号二进制补码样点，in_valid 为高时有效
-    input  wire logic                     in_valid,          // 双通道样点有效，高电平可连续保持
+    input  wire logic signed [DATA_WIDTH-1:0] data_in,       // 单路有符号二进制补码样点，in_valid 为高时有效
+    input  wire logic                     in_valid,          // 输入样点有效，高电平可连续保持
 
     input  wire logic                     fifo_full,         // FIFO 写满状态，高电平时禁止写入
     input  wire logic                     fifo_wr_rst_busy,  // FIFO 写端复位忙状态，高电平时禁止写入
-    output logic [(2*DATA_WIDTH)-1:0]      fifo_din,          // FIFO 打包数据，高位为 A、低位为 B，无整体符号含义
-    output logic                          fifo_wr_en,        // FIFO 写使能，高电平表示当前上升沿写入一组样点
+    output logic [DATA_WIDTH-1:0]          fifo_din,          // FIFO 写数据，保持 data_in 的二进制补码位模式
+    output logic                          fifo_wr_en,        // FIFO 写使能，高电平表示当前上升沿写入一个样点
 
     output logic                          capture_busy,      // 正在采集一帧的状态电平
     output logic                          frame_pending,     // FIFO 中有完整帧等待读取的状态电平
@@ -112,9 +112,9 @@ module adc_write_controller #(
             else $fatal(1, "FRAME_LENGTH 必须大于 0");
     end
 
-    // 打包仅保留两路补码位模式，不把 2*DATA_WIDTH 位整体解释成有符号数。
     always_comb begin
-        fifo_din      = {data_a, data_b};
+        // FIFO 端口按位保存补码；无需改变符号或执行数值转换。
+        fifo_din      = data_in;
         capture_busy  = (state == STATE_CAPTURE);
         frame_pending = (state == STATE_WAIT_CONSUMED);
 
