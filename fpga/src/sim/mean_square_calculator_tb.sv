@@ -127,8 +127,21 @@ module mean_square_calculator_tb;
         input string           case_name
     );
         longint unsigned expected_mean;
+        int unsigned wait_cycles;
         begin
             expected_mean = (expected_sum + 64'd32768) >> 16;
+            // Model the top-level last-sample handshake while the output
+            // pipeline drains.
+            @(negedge clk);
+            sample_valid = 1'b0;
+            sample_first = 1'b0;
+            sample_last  = 1'b0;
+            wait_cycles = 0;
+            while (!result_valid && (wait_cycles < 16)) begin
+                @(posedge clk);
+                #1;
+                wait_cycles = wait_cycles + 1;
+            end
             assert (result_valid)
                 else $fatal(1, "%s未产生result_valid：time=%0t", case_name, $time);
             assert (mean_square_out == expected_mean[31:0])

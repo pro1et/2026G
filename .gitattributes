@@ -1,0 +1,54 @@
+# Keep source and configuration files deterministic in this Windows-based
+# Vivado/Vitis workspace.  Git stores normalized text internally and checks it
+# out with CRLF line endings.
+/.gitattributes text eol=crlf
+*.v      text eol=crlf
+*.sv     text eol=crlf
+*.vh     text eol=crlf
+*.svh    text eol=crlf
+*.xdc    text eol=crlf
+*.tcl    text eol=crlf
+*.c      text eol=crlf
+*.h      text eol=crlf
+*.cpp    text eol=crlf
+*.hpp    text eol=crlf
+*.ld     text eol=crlf
+*.md     text eol=crlf
+*.txt    text eol=crlf
+*.csv    text eol=crlf
+*.json   text eol=crlf
+*.xml    text eol=crlf
+*.yml    text eol=crlf
+*.yaml   text eol=crlf
+*.ps1    text eol=crlf
+*.sh     text eol=crlf
+
+# Project documents, archives, images, programming files and exported hardware
+# are binary and must never undergo line-ending conversion.
+*.pdf    binary
+*.doc    binary
+*.docx   binary
+*.xls    binary
+*.xlsx   binary
+*.ppt    binary
+*.pptx   binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.bmp    binary
+*.ico    binary
+*.zip    binary
+*.rar    binary
+*.7z     binary
+*.HMI    binary
+*.hmi    binary
+*.bit    binary
+*.bin    binary
+*.elf    binary
+*.xsa    binary
+*.dcp    binary
+*.ltx    binary
+*.mmi    binary
+*.wdb    binary
+*.wcfg   binary

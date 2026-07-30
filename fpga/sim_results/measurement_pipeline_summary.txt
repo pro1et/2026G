@@ -1,5 +1,0 @@
-vpp=744 (0x000002e8)
-mean_square=42003 (0x0000a413)
-bram_write_count=32770
-first_wave_word=0x0003fffc
-last_wave_word=0x01590159

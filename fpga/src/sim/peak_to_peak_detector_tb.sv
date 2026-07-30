@@ -121,7 +121,20 @@ module peak_to_peak_detector_tb;
         input logic [31:0] expected_value,
         input string       case_name
     );
+        int unsigned wait_cycles;
         begin
+            // The integration top removes split_valid immediately after the
+            // final FIFO handshake while this module post-processes the frame.
+            @(negedge clk);
+            sample_valid = 1'b0;
+            sample_first = 1'b0;
+            sample_last  = 1'b0;
+            wait_cycles = 0;
+            while (!vpp_valid && (wait_cycles < 128)) begin
+                @(posedge clk);
+                #1;
+                wait_cycles = wait_cycles + 1;
+            end
             assert (vpp_valid)
                 else $fatal(1, "%s未产生vpp_valid：time=%0t", case_name, $time);
             assert (vpp_out == expected_value)
