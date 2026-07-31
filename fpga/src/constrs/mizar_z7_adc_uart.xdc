@@ -2,21 +2,24 @@
 # 文件名称：mizar_z7_adc_uart.xdc
 # 目标器件：XC7Z020-CLG400-2
 # 开发板：Mizar Z7
-# 当前顶层：Time_Calibration_wrapper
+# 当前顶层：FFT_chain_wrapper
 #
 # 主要功能：
-#   按 Time_Calibration_wrapper 的实际外部端口名称，约束 50 MHz 系统
+#   按 FFT_chain_wrapper 的实际外部端口名称，约束 50 MHz 系统
 #   时钟、PL 总复位键、双路 AD 模块和 HMI UART1 管脚。
 #
 # 参考来源：
 #   E:/FPGA_PJ/Prepare/work/PL/constraints/pl_top_mizar_adda_hmi.xdc
 #
-# Time_Calibration_wrapper 实际端口：
+# FFT_chain_wrapper 实际端口：
 #   clk_50m_0、rst_n_0                           -> 系统时钟和 PL 总复位
 #   adc_data_a_0[9:0]、adc_clk_a_0、adc_oe_a_0 -> AD 通道 1
 #   adc_data_b_0[9:0]、adc_clk_b_0、adc_oe_b_0 -> AD 通道 2
 #   UART1_TX_0、UART1_RX_0                     -> PS UART1 的 EMIO 外部端口
 #   DDR_*、FIXED_IO_*                          -> Zynq PS 专用接口，不在本文件约束
+#
+# TIME_BRAM 和 SPECTRUM_BRAM 都是 FFT_chain BD 内部接口，不会出现在
+# FFT_chain_wrapper 的外部端口中，因此不需要 PACKAGE_PIN 约束。
 #
 # 注意：
 #   rst_n 使用 PL_KEY1/K4，按键松开为高、按下为低。
