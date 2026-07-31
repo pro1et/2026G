@@ -34,18 +34,24 @@ fpga/src/hdl/spectrol.sv
 
 ## 1.1 当前实现范围
 
-当前版本只实现第一阶段“功率谱写入频谱 BRAM”，暂不实现：
+当前版本已经实现：
 
-* 基频检测启动和读取服务；
+* 第一阶段：功率谱写入频谱 BRAM；
+* 写完后的单拍 `base_start`；
+* 基频检测模块的 BRAM 请求、固定读取延迟和返回数据服务；
+* 等待 `base_done` 后产生整帧 `frame_done`。
+
+当前暂不实现：
+
 * 能量计算启动和读取服务；
-* 频谱 BRAM 读延迟封装；
-* 多读取者之间的 BRAM 仲裁。
+* 基频检测与能量计算之间的多读取者仲裁。
 
 当前模块接口为：
 
 ```systemverilog
 module spectrol #(
-    parameter int unsigned POWER_WIDTH = 32
+    parameter int unsigned POWER_WIDTH     = 32,
+    parameter int unsigned BRAM_RD_LATENCY = 2
 ) (
     input  logic                    clk,
     input  logic                    rst,
@@ -53,6 +59,7 @@ module spectrol #(
 
     input  logic                    start,
     output logic                    busy,
+    output logic                    spectrum_write_done,
     output logic                    frame_done,
     output logic                    protocol_error,
 
@@ -63,10 +70,21 @@ module spectrol #(
     input  logic                    power_first,
     input  logic                    power_last,
 
+    output logic                    base_start,
+    input  logic                    base_done,
+    input  logic                    base_valid,
+
+    input  logic                    base_mem_req,
+    input  logic [10:0]             base_mem_addr,
+    output logic                    base_mem_ready,
+    output logic                    base_mem_rvalid,
+    output logic [POWER_WIDTH-1:0]  base_mem_rdata,
+
     output logic                    spectrum_bram_en,
     output logic                    spectrum_bram_we,
     output logic [10:0]             spectrum_bram_addr,
-    output logic [POWER_WIDTH-1:0]  spectrum_bram_din
+    output logic [POWER_WIDTH-1:0]  spectrum_bram_din,
+    input  logic [POWER_WIDTH-1:0]  spectrum_bram_dout
 );
 ```
 
@@ -81,6 +99,10 @@ spectrum_bram_addr = k  →  第k个32位功率值
 
 这里不是 AXI 字节地址，因此不需要对地址左移 2 位。若以后连接 AXI 地址接口，
 应在相应适配层中转换为 `k << 2`。
+
+`spectrum_write_done` 表示 2048 点功率谱已经写完；它不代表整帧频域处理结束。
+当前 `frame_done` 在基频检测模块给出 `base_done`、且所有 BRAM 返回数据均已
+排空后产生。
 
 ---
 
@@ -238,7 +260,8 @@ base_index_500 = 40
 
 ### 第三阶段：基波与谐波能量计算
 
-当基频检测完成且 `base_valid = 1` 时，Spectrol 向能量计算模块产生一拍启动信号：
+基频检测完成后，无论 `base_valid` 为 1 还是 0，Spectrol都向能量计算模块
+产生一拍启动信号：
 
 ```text
 energy_start
@@ -267,7 +290,6 @@ energy_mem_rdata
 * 频谱读取；
 * 能量累计；
 * 能量结果 BRAM写入；
-* 结果数量维护；
 * 结果有效状态发布。
 
 Spectrol 只需要等待：
@@ -293,16 +315,15 @@ START_BASE
   ↓
 WAIT_BASE
   ↓
-检查 base_valid
-  ├─无效：FRAME_DONE
-  └─有效：
-       ↓
-    START_ENERGY
-       ↓
-    WAIT_ENERGY
-       ↓
-    FRAME_DONE
+START_ENERGY
+  ↓
+WAIT_ENERGY
+  ↓
+FRAME_DONE
 ```
+
+当 `base_valid=0` 时仍执行能量阶段，由能量模块写入零能量和
+`base_invalid=1` 的最终状态字，避免PS误读上一帧有效结果。
 
 Spectrol 不再包含结果写入阶段。
 

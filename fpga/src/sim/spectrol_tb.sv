@@ -9,6 +9,7 @@ module spectrol_tb;
 
     logic start = 1'b0;
     wire  busy;
+    wire  spectrum_write_done;
     wire  frame_done;
     wire  protocol_error;
 
@@ -19,6 +20,15 @@ module spectrol_tb;
     logic        power_first = 1'b0;
     logic        power_last = 1'b0;
 
+    wire         base_start;
+    logic        base_done = 1'b0;
+    logic        base_valid = 1'b1;
+    logic        base_mem_req = 1'b0;
+    logic [10:0] base_mem_addr = 11'd0;
+    wire         base_mem_ready;
+    wire         base_mem_rvalid;
+    wire [31:0]  base_mem_rdata;
+
     wire        spectrum_bram_en;
     wire        spectrum_bram_we;
     wire [10:0] spectrum_bram_addr;
@@ -26,6 +36,8 @@ module spectrol_tb;
 
     logic [31:0] bram_model [0:2047];
     integer write_count = 0;
+    integer write_done_count = 0;
+    integer base_start_count = 0;
     integer done_count = 0;
     integer cycle_count = 0;
     integer index;
@@ -38,6 +50,7 @@ module spectrol_tb;
         .clear_error        (clear_error),
         .start              (start),
         .busy               (busy),
+        .spectrum_write_done(spectrum_write_done),
         .frame_done         (frame_done),
         .protocol_error     (protocol_error),
         .power_data         (power_data),
@@ -46,10 +59,19 @@ module spectrol_tb;
         .power_ready        (power_ready),
         .power_first        (power_first),
         .power_last         (power_last),
+        .base_start         (base_start),
+        .base_done          (base_done),
+        .base_valid         (base_valid),
+        .base_mem_req       (base_mem_req),
+        .base_mem_addr      (base_mem_addr),
+        .base_mem_ready     (base_mem_ready),
+        .base_mem_rvalid    (base_mem_rvalid),
+        .base_mem_rdata     (base_mem_rdata),
         .spectrum_bram_en   (spectrum_bram_en),
         .spectrum_bram_we   (spectrum_bram_we),
         .spectrum_bram_addr (spectrum_bram_addr),
-        .spectrum_bram_din  (spectrum_bram_din)
+        .spectrum_bram_din  (spectrum_bram_din),
+        .spectrum_bram_dout (32'd0)
     );
 
     function automatic logic [31:0] expected_data(input integer bin_index);
@@ -94,15 +116,17 @@ module spectrol_tb;
     always_ff @(posedge clk) begin
         if (rst) begin
             write_count <= 0;
+            write_done_count <= 0;
+            base_start_count <= 0;
             done_count  <= 0;
             cycle_count <= 0;
         end else begin
             cycle_count <= cycle_count + 1;
 
-            assert (spectrum_bram_en == spectrum_bram_we)
-                else $fatal(1, "BRAM en/we mismatch");
+            assert (!spectrum_bram_we || spectrum_bram_en)
+                else $fatal(1, "BRAM write without enable");
 
-            if (spectrum_bram_en) begin
+            if (spectrum_bram_en && spectrum_bram_we) begin
                 assert (busy)
                     else $fatal(1, "BRAM write while spectrol is idle");
                 assert (spectrum_bram_addr == write_count[10:0])
@@ -114,6 +138,14 @@ module spectrol_tb;
 
                 bram_model[spectrum_bram_addr] <= spectrum_bram_din;
                 write_count <= write_count + 1;
+            end
+
+            if (spectrum_write_done) begin
+                write_done_count <= write_done_count + 1;
+            end
+
+            if (base_start) begin
+                base_start_count <= base_start_count + 1;
             end
 
             if (frame_done) begin
@@ -155,14 +187,15 @@ module spectrol_tb;
             send_power(index);
         end
 
-        @(posedge clk);
-        #1;
-        assert (!busy && !power_ready)
-            else $fatal(1, "Spectrol did not return to IDLE");
+        repeat (3) @(posedge clk);
+        assert (busy && !power_ready)
+            else $fatal(1, "Spectrol did not enter base-detection stage");
         assert (write_count == 2048)
             else $fatal(1, "Expected 2048 writes, got %0d", write_count);
-        assert (done_count == 1)
-            else $fatal(1, "Expected one frame_done pulse, got %0d", done_count);
+        assert (write_done_count == 1 && base_start_count == 1)
+            else $fatal(1, "Write/base start pulse count mismatch");
+        assert (done_count == 0)
+            else $fatal(1, "frame_done asserted before base detection");
         assert (!protocol_error)
             else $fatal(1, "Unexpected protocol_error after valid frame");
 
@@ -170,6 +203,16 @@ module spectrol_tb;
             assert (bram_model[index] == expected_data(index))
                 else $fatal(1, "Stored BRAM data mismatch at bin %0d", index);
         end
+
+        @(negedge clk);
+        base_done <= 1'b1;
+        @(negedge clk);
+        base_done <= 1'b0;
+        wait (frame_done);
+        @(posedge clk);
+        #1;
+        assert (!busy && done_count == 1)
+            else $fatal(1, "Spectrol did not finish after base_done");
 
         // 注入错误首点：bin不是0。错误数据不得写入BRAM，当前帧必须中止。
         pulse_start();

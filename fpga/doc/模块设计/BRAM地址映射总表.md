@@ -363,7 +363,7 @@ PS AXI 基地址：待分配
 | W7 | `0x001C` | `energy_shift` | 当前规划固定为 3 |
 | W8 | `0x0020` | `absolute_threshold` | 本次使用的绝对能量阈值 |
 | W9 | `0x0024` | `ratio_parameter` | `{ratio_den[15:0], ratio_num[15:0]}` |
-| W10～W15 | `0x0028`～`0x003C` | 保留 | 写 0 |
+| W10～W15 | `0x0028`～`0x003C` | 保留 | 每帧显式写 0 |
 
 频率编号换算：
 
@@ -395,7 +395,7 @@ frequency_hz = index_500 × 500 Hz
 写入顺序要求：
 
 1. 新测量开始时先写 W0，令 `result_valid=0`、`busy=1`；
-2. 写 W1～W9 和保留字段；
+2. 写 W1～W9，并将 W10～W15 显式写 0；
 3. 最后再次写 W0，令 `busy=0`、`result_valid=1`；
 4. PS 只有看到最终 `W0[0]=1` 后才允许读取 W1～W9。
 
