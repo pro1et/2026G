@@ -187,6 +187,10 @@ module fft_measurement_chain #(
     wire               fft_last;
     wire               fft_config_done_unused;
     wire               fft_protocol_error;
+    // Non-Realtime FFT channel halts report legal AXI wait states. Preserve
+    // the sticky diagnostic for ILA/debug, but do not classify it as a fatal
+    // frame error because the FFT resumes without corrupting the frame.
+    (* KEEP = "TRUE", MARK_DEBUG = "TRUE" *)
     wire               fft_channel_halt;
 
     // One-entry elastic register between the FFT wrapper and the power
@@ -402,7 +406,7 @@ module fft_measurement_chain #(
         fir_protocol_error || fir_saturation_error ||
         vpp_error || mean_square_overflow || measurement_writer_error ||
         decim_protocol_error || decim_overrun_error ||
-        window_protocol_error || fft_protocol_error || fft_channel_halt ||
+        window_protocol_error || fft_protocol_error ||
         power_protocol_error || spectrum_protocol_error;
 
     clock_tree u_clock_tree (
