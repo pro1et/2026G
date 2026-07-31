@@ -1,0 +1,6 @@
+fir_count=65536
+decim_count=4096
+window_count=4096
+vpp=722
+mean_square=41693
+pipeline_error=0

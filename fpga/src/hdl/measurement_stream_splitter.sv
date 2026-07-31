@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-// Combinational three-way fanout for the filtered measurement stream.
+// Combinational four-way fanout for the filtered measurement stream.
 // All consumers are non-blocking, so the splitter does not need ready signals
 // or internal storage. Frame markers are duplicated with the valid sample.
 module measurement_stream_splitter (
@@ -23,7 +23,12 @@ module measurement_stream_splitter (
     output wire logic signed [15:0] wave_data,
     output wire logic               wave_valid,
     output wire logic               wave_first,
-    output wire logic               wave_last
+    output wire logic               wave_last,
+
+    output wire logic signed [15:0] spectrum_data,
+    output wire logic               spectrum_valid,
+    output wire logic               spectrum_first,
+    output wire logic               spectrum_last
 );
 
     assign vpp_data          = in_data;
@@ -38,6 +43,10 @@ module measurement_stream_splitter (
     assign wave_valid        = in_valid;
     assign wave_first        = in_first;
     assign wave_last         = in_last;
+    assign spectrum_data     = in_data;
+    assign spectrum_valid    = in_valid;
+    assign spectrum_first    = in_first;
+    assign spectrum_last     = in_last;
 
 endmodule
 

@@ -1,0 +1,8 @@
+fir_sample_count=65536
+decim_sample_count=4096
+window_sample_count=4096
+decim_mismatch_count=0
+decim_max_abs_error_lsb=0
+window_mismatch_count=0
+window_max_abs_error_lsb=0
+result=PASS

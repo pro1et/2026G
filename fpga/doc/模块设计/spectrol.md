@@ -12,10 +12,10 @@
 
 其中，Spectrol 只负责管理频谱 BRAM，不负责管理能量结果 BRAM。
 
-模块采用 Verilog-2001 编写，文件名建议为：
+模块采用 SystemVerilog 编写，文件名为：
 
 ```text
-spectrol.v
+fpga/src/hdl/spectrol.sv
 ```
 
 当前频域处理参数如下：
@@ -25,7 +25,62 @@ spectrol.v
 * 实信号只分析正频率部分；
 * 有效频谱下标约为 0～2047；
 * 每根 FFT 谱线对应约 488.28125 Hz；
-* 功率谱定义为：P[k] = Re[k]² + Im[k]²。
+* 功率谱定义为：P[k] = Re[k]² + Im[k]²；
+* 功率计算模块已经完成固定缩放、四舍五入和 32 位处理；
+* Spectrol、频谱 BRAM、基频检测和能量计算之间的功率数据统一为 32 位无符号数；
+* `POWER_WIDTH` 固定为 32。
+
+---
+
+## 1.1 当前实现范围
+
+当前版本只实现第一阶段“功率谱写入频谱 BRAM”，暂不实现：
+
+* 基频检测启动和读取服务；
+* 能量计算启动和读取服务；
+* 频谱 BRAM 读延迟封装；
+* 多读取者之间的 BRAM 仲裁。
+
+当前模块接口为：
+
+```systemverilog
+module spectrol #(
+    parameter int unsigned POWER_WIDTH = 32
+) (
+    input  logic                    clk,
+    input  logic                    rst,
+    input  logic                    clear_error,
+
+    input  logic                    start,
+    output logic                    busy,
+    output logic                    frame_done,
+    output logic                    protocol_error,
+
+    input  logic [POWER_WIDTH-1:0]  power_data,
+    input  logic [10:0]             power_bin,
+    input  logic                    power_valid,
+    output logic                    power_ready,
+    input  logic                    power_first,
+    input  logic                    power_last,
+
+    output logic                    spectrum_bram_en,
+    output logic                    spectrum_bram_we,
+    output logic [10:0]             spectrum_bram_addr,
+    output logic [POWER_WIDTH-1:0]  spectrum_bram_din
+);
+```
+
+`start` 在空闲状态下启动一帧写入。上游必须保持 `power_valid`、`power_bin`、
+`power_data`、`power_first` 和 `power_last`，直到 `power_ready = 1` 完成握手。
+
+频谱 BRAM 使用 11 位逻辑字地址：
+
+```text
+spectrum_bram_addr = k  →  第k个32位功率值
+```
+
+这里不是 AXI 字节地址，因此不需要对地址左移 2 位。若以后连接 AXI 地址接口，
+应在相应适配层中转换为 `k << 2`。
 
 ---
 
@@ -98,27 +153,32 @@ FFT 输出经过功率计算后形成：
 
 ```text
 power_valid
+power_ready
 power_bin
 power_data
+power_first
 power_last
 ```
 
 其中：
 
 * `power_valid`：当前功率数据有效；
+* `power_ready`：Spectrol 当前可以接收功率数据；
 * `power_bin`：当前 FFT 频点下标；
 * `power_data`：当前频点功率；
+* `power_first`：当前点是否为 bin 0；
 * `power_last`：当前帧最后一个有效功率谱点。
 
 Spectrol 在该阶段驱动频谱 BRAM：
 
 ```text
+接收条件   = power_valid && power_ready
 BRAM地址   = power_bin
 BRAM写数据 = power_data
-BRAM写使能 = power_valid
+BRAM写使能 = power_valid && power_ready && 输入协议正确
 ```
 
-收到 `power_last` 后，表示完整功率谱已经写入频谱 BRAM。
+成功接收且写入 `power_last` 后，表示完整功率谱已经写入频谱 BRAM。
 
 ---
 
@@ -261,8 +321,8 @@ WRITE_RESULT
 ### 写功率谱阶段
 
 ```verilog
-spectrum_bram_en   = power_valid;
-spectrum_bram_we   = power_valid;
+spectrum_bram_en   = power_valid && power_ready && input_protocol_ok;
+spectrum_bram_we   = power_valid && power_ready && input_protocol_ok;
 spectrum_bram_addr = power_bin;
 spectrum_bram_din  = power_data;
 ```
@@ -416,25 +476,32 @@ localparam STATE_ERROR        = 4'd7;
 
 ---
 
-## 11. 推荐接口框架
+## 11. 后续完整版本的目标接口框架
+
+下面的接口是加入基频检测和能量计算后的目标，并非当前
+`fpga/src/hdl/spectrol.sv` 已实现的端口集合。
 
 ```verilog
 module spectrol #(
-    parameter POWER_WIDTH     = 40,
+    parameter POWER_WIDTH     = 32,
     parameter BRAM_RD_LATENCY = 2
 )(
     input                         clk,
     input                         rst,
+    input                         clear_error,
 
     // 整体控制
     input                         start,
     output reg                    busy,
     output reg                    frame_done,
+    output reg                    protocol_error,
 
     // 功率谱写入
     input                         power_valid,
+    output                        power_ready,
     input      [10:0]             power_bin,
     input      [POWER_WIDTH-1:0]  power_data,
+    input                         power_first,
     input                         power_last,
 
     // 基频检测控制
