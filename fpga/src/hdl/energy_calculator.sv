@@ -1,110 +1,56 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-// ============================================================================
-// 模块名称：energy_calculator
-//
-// 主要功能：
-//   根据基频检测结果依次计算基波、二次谐波和三次谐波的7点功率谱能量，
-//   判断高次谐波是否存在，并将一帧完整结果写入独立的能量结果BRAM。
-//
-// 使用方法：
-//   1. 基频检测结束后，将base_valid、base_index_500和阈值参数保持稳定；
-//   2. 向start输入一个时钟周期的高脉冲；
-//   3. 通过mem_req/mem_ready提交频谱读取请求，只在mem_rvalid时接收数据；
-//   4. 等待done单拍脉冲，随后可由PS读取能量结果BRAM。
-//
-// 连接说明：
-//   clk/result_bram_*  <- 本模块工作时钟及能量结果BRAM的PL写端口
-//   start              <- Spectrol的energy_start
-//   base_*             <- base_detector的检测结果
-//   mem_*              <-> Spectrol提供的能量频谱读取接口
-//   done               -> Spectrol的energy_done
-//
-// 时钟与复位：
-//   所有逻辑位于clk时钟域；rst为高电平有效的同步复位。复位期间停止读请求和
-//   BRAM写入，并清除busy、done及普通状态输出。
-//
-// 输入格式：
-//   mem_rdata为U32功率谱；base_index_500的单位为500 Hz；absolute_threshold
-//   使用“功率谱已右移8位、7点求和后、能量尚未右移3位”的原始能量尺度。
-//
-// 输出格式：
-//   原始7点能量内部使用POWER_WIDTH+3位无符号数。写入BRAM的能量统一执行
-//   (energy_raw + 4) >> 3，并在超过U32时防御性饱和。
-//
-// 握手时序：
-//   mem_req在请求未被接受时保持有效且地址稳定；mem_req与mem_ready同时为1
-//   表示请求被接受。模块允许提交请求和接收旧请求返回在同一周期发生。
-//   最终状态字W0是每帧最后一次BRAM写入；done在该写入完成后保持一个周期。
-//
-// 参数说明：
-//   当前系统配置为U32功率、11位频谱地址、7点窗口、最大bin 2047和右移3位。
-//   参数保留用于独立验证防御性位宽逻辑，系统集成时应使用默认配置。
-//
-// 错误行为：
-//   busy期间的start被忽略；ratio_den为0时置threshold_invalid且高次谐波均
-//   判为不存在；无效基频或越界候选不发起读取并写入零能量；收到无对应请求的
-//   mem_rvalid时置read_error。接口不包含超时计数，缺失返回会使模块保持busy。
-//
-// 使用限制：
-//   同一候选最多允许WINDOW_POINTS个未完成读请求。上游必须保证每个被接受的
-//   请求最终恰好返回一次，并且返回顺序与请求顺序一致。
-// ============================================================================
+// Calculate the base-wave energy, then scan integer harmonics in ascending
+// frequency order.  The first two harmonics that pass both thresholds are
+// published as harmonic A and harmonic B.  They are not fixed to orders 2/3.
 module energy_calculator #(
-    parameter int unsigned POWER_WIDTH         = 32,
-    parameter int unsigned ENERGY_ACC_WIDTH    = POWER_WIDTH + 3,
-    parameter int unsigned ENERGY_SHIFT        = 3,
-    parameter int unsigned INDEX_WIDTH         = 16,
-    parameter int unsigned SPECTRUM_ADDR_WIDTH = 11,
-    parameter int unsigned RESULT_ADDR_WIDTH   = 4,
-    parameter int unsigned WINDOW_RADIUS       = 3,
-    parameter int unsigned MAX_SPECTRUM_BIN    = 2047
+    parameter int unsigned POWER_WIDTH               = 32,
+    parameter int unsigned ENERGY_ACC_WIDTH          = POWER_WIDTH + 3,
+    parameter int unsigned ENERGY_SHIFT              = 3,
+    parameter int unsigned INDEX_WIDTH               = 16,
+    parameter int unsigned SPECTRUM_ADDR_WIDTH       = 11,
+    parameter int unsigned RESULT_ADDR_WIDTH         = 4,
+    parameter int unsigned WINDOW_RADIUS             = 3,
+    parameter int unsigned MAX_SPECTRUM_BIN          = 2047,
+    // Unit: 500 Hz.  1000 includes the 500 kHz measurement boundary.
+    parameter int unsigned MAX_MEASUREMENT_INDEX_500 = 1000
 ) (
-    // 时钟与复位
-    input  wire logic                              clk,  // 模块工作时钟
-    input  wire logic                              rst,  // 高电平有效同步复位
+    input  wire logic                              clk,
+    input  wire logic                              rst,
 
-    // 控制接口
-    input  wire logic                              start, // 空闲时采样的单拍启动脉冲
-    output      logic                              busy,  // 模块正在处理一帧
-    output      logic                              done,  // 最终状态字写完后的单拍脉冲
+    input  wire logic                              start,
+    output      logic                              busy,
+    output      logic                              done,
 
-    // 基频结果和谐波判断配置
-    input  wire logic                              base_valid,     // 基频检测结果有效
-    input  wire logic [INDEX_WIDTH-1:0]            base_index_500, // 基频编号，单位500 Hz
-    input  wire logic [31:0]                       absolute_threshold, // 原始7点能量绝对阈值
-    input  wire logic [15:0]                       ratio_num,      // 相对基波能量比例分子
-    input  wire logic [15:0]                       ratio_den,      // 相对基波能量比例分母
+    input  wire logic                              base_valid,
+    input  wire logic [INDEX_WIDTH-1:0]            base_index_500,
+    input  wire logic [31:0]                       absolute_threshold,
+    input  wire logic [15:0]                       ratio_num,
+    input  wire logic [15:0]                       ratio_den,
 
-    // 通过Spectrol读取频谱BRAM
-    output      logic                              mem_req,    // 频谱读取请求，未接受时保持
-    output      logic [SPECTRUM_ADDR_WIDTH-1:0]    mem_addr,   // 频谱BRAM逻辑字地址
-    input  wire logic                              mem_ready,  // Spectrol本周期可接受请求
-    input  wire logic                              mem_rvalid, // 返回功率数据有效
-    input  wire logic [POWER_WIDTH-1:0]            mem_rdata,  // 无符号功率谱数据
+    output      logic                              mem_req,
+    output      logic [SPECTRUM_ADDR_WIDTH-1:0]    mem_addr,
+    input  wire logic                              mem_ready,
+    input  wire logic                              mem_rvalid,
+    input  wire logic [POWER_WIDTH-1:0]            mem_rdata,
 
-    // 能量结果BRAM写端口
-    output      logic                              result_bram_en,   // BRAM端口使能
-    output      logic                              result_bram_we,   // 单比特整字写使能
-    output      logic [RESULT_ADDR_WIDTH-1:0]      result_bram_addr, // 32位字地址
-    output      logic [31:0]                       result_bram_din,  // 32位写数据
+    output      logic                              result_bram_en,
+    output      logic                              result_bram_we,
+    output      logic [RESULT_ADDR_WIDTH-1:0]      result_bram_addr,
+    output      logic [31:0]                       result_bram_din,
 
-    // 状态和调试输出
-    output      logic [2:0]                        harmonic_present_mask, // bit0～2对应1～3次
-    output      logic [2:0]                        position_valid_mask,   // 三个7点窗口有效位
-    output      logic                              result_valid,          // 当前结果BRAM已提交完整帧
-    output      logic                              energy_overflow        // 至少一个能量发生饱和
+    // bit0=base, bit1=nearest detected harmonic A, bit2=next harmonic B.
+    output      logic [2:0]                        harmonic_present_mask,
+    output      logic [2:0]                        position_valid_mask,
+    output      logic                              result_valid,
+    output      logic                              energy_overflow
 );
 
-    localparam int unsigned WINDOW_POINTS =
-        (2 * WINDOW_RADIUS) + 1;
-    localparam int unsigned COUNT_WIDTH =
-        $clog2(WINDOW_POINTS + 1);
-    localparam int unsigned RATIO_PRODUCT_WIDTH =
-        ENERGY_ACC_WIDTH + 16;
-    localparam int unsigned MAX_CENTER_BIN =
-        MAX_SPECTRUM_BIN - WINDOW_RADIUS;
+    localparam int unsigned WINDOW_POINTS = (2 * WINDOW_RADIUS) + 1;
+    localparam int unsigned COUNT_WIDTH = $clog2(WINDOW_POINTS + 1);
+    localparam int unsigned RATIO_PRODUCT_WIDTH = ENERGY_ACC_WIDTH + 16;
+    localparam int unsigned MAX_CENTER_BIN = MAX_SPECTRUM_BIN - WINDOW_RADIUS;
 
     typedef enum logic [3:0] {
         STATE_IDLE,
@@ -114,7 +60,8 @@ module energy_calculator #(
         STATE_CHECK_POSITION,
         STATE_READ,
         STATE_RATIO_MULTIPLY,
-        STATE_CHECK,
+        STATE_CHECK_CANDIDATE,
+        STATE_FINALIZE,
         STATE_WRITE_RESULTS,
         STATE_COMMIT
     } state_t;
@@ -127,12 +74,14 @@ module energy_calculator #(
     logic [15:0]                       ratio_num_latched;
     logic [15:0]                       ratio_den_latched;
 
-    logic [1:0]                        candidate_order;
+    // Order 1 is the base.  Orders 2...floor(500 kHz/f0) are scanned.
+    logic [7:0]                        candidate_order;
+    logic [1:0]                        harmonic_found_count;
+    logic [31:0]                       scan_index_500;
     logic [31:0]                       candidate_index_calc;
     logic [39:0]                       candidate_numerator_calc;
     logic [31:0]                       current_candidate_index;
     logic [39:0]                       candidate_bin_reg;
-    logic [31:0]                       candidate_index [0:2];
     logic [SPECTRUM_ADDR_WIDTH-1:0]    window_start_addr;
 
     logic [39:0]                       divide_dividend;
@@ -150,28 +99,34 @@ module energy_calculator #(
     logic [ENERGY_ACC_WIDTH-1:0]       energy_acc_next;
 
     logic [ENERGY_ACC_WIDTH-1:0]       base_energy_raw;
-    logic [ENERGY_ACC_WIDTH-1:0]       harmonic2_energy_raw;
-    logic [ENERGY_ACC_WIDTH-1:0]       harmonic3_energy_raw;
+    logic [ENERGY_ACC_WIDTH-1:0]       candidate_energy_raw;
+    logic [ENERGY_ACC_WIDTH-1:0]       harmonic_a_energy_raw;
+    logic [ENERGY_ACC_WIDTH-1:0]       harmonic_b_energy_raw;
     logic [31:0]                       base_energy_out;
-    logic [31:0]                       harmonic2_energy_out;
-    logic [31:0]                       harmonic3_energy_out;
+    logic [31:0]                       harmonic_a_energy_out;
+    logic [31:0]                       harmonic_b_energy_out;
+    logic [31:0]                       base_index_out;
+    logic [31:0]                       harmonic_a_index;
+    logic [31:0]                       harmonic_b_index;
+    logic [7:0]                        harmonic_a_order;
+    logic [7:0]                        harmonic_b_order;
 
     logic                              base_invalid;
     logic                              threshold_invalid;
     logic                              read_error;
     logic [RESULT_ADDR_WIDTH-1:0]      write_addr;
 
+    // Datapath-only registers intentionally have no reset.  Each is
+    // overwritten before its consuming state, avoiding wide reset fanout.
     logic [RATIO_PRODUCT_WIDTH-1:0]    base_ratio_product;
-    logic [RATIO_PRODUCT_WIDTH-1:0]    harmonic2_ratio_product;
-    logic [RATIO_PRODUCT_WIDTH-1:0]    harmonic3_ratio_product;
+    logic [RATIO_PRODUCT_WIDTH-1:0]    candidate_ratio_product;
     logic [RATIO_PRODUCT_WIDTH-1:0]    base_ratio_product_calc;
-    logic [RATIO_PRODUCT_WIDTH-1:0]    harmonic2_ratio_product_calc;
-    logic [RATIO_PRODUCT_WIDTH-1:0]    harmonic3_ratio_product_calc;
+    logic [RATIO_PRODUCT_WIDTH-1:0]    candidate_ratio_product_calc;
     logic [ENERGY_ACC_WIDTH-1:0]       absolute_threshold_ext;
 
     logic [32:0]                       base_scaled;
-    logic [32:0]                       harmonic2_scaled;
-    logic [32:0]                       harmonic3_scaled;
+    logic [32:0]                       harmonic_a_scaled;
+    logic [32:0]                       harmonic_b_scaled;
     logic [31:0]                       status_common;
     logic [31:0]                       status_busy;
     logic [31:0]                       status_final;
@@ -180,27 +135,28 @@ module energy_calculator #(
 
     initial begin
         assert (POWER_WIDTH > 0)
-            else $fatal(1, "POWER_WIDTH必须大于0");
+            else $fatal(1, "POWER_WIDTH must be positive");
         assert (ENERGY_ACC_WIDTH >= POWER_WIDTH + 3)
-            else $fatal(1, "ENERGY_ACC_WIDTH不足以保存7点功率和");
+            else $fatal(1, "ENERGY_ACC_WIDTH is too small for seven bins");
         assert (ENERGY_ACC_WIDTH >= 32)
-            else $fatal(1, "ENERGY_ACC_WIDTH必须至少为32");
+            else $fatal(1, "ENERGY_ACC_WIDTH must be at least 32");
         assert (ENERGY_SHIFT > 0 && ENERGY_SHIFT <= ENERGY_ACC_WIDTH)
-            else $fatal(1, "ENERGY_SHIFT超出合法范围");
+            else $fatal(1, "ENERGY_SHIFT is out of range");
         assert (INDEX_WIDTH > 0 && INDEX_WIDTH <= 32)
-            else $fatal(1, "INDEX_WIDTH必须位于1到32之间");
+            else $fatal(1, "INDEX_WIDTH is out of range");
         assert (SPECTRUM_ADDR_WIDTH > 0 &&
                 MAX_SPECTRUM_BIN < (1 << SPECTRUM_ADDR_WIDTH))
-            else $fatal(1, "频谱地址位宽不足");
+            else $fatal(1, "spectrum address width is too small");
         assert (RESULT_ADDR_WIDTH >= 4)
-            else $fatal(1, "结果BRAM地址位宽必须至少为4");
+            else $fatal(1, "result address width must be at least four");
         assert (WINDOW_RADIUS == 3 && WINDOW_POINTS == 7)
-            else $fatal(1, "当前版本仅验证7点能量窗口");
+            else $fatal(1, "this implementation requires a seven-bin window");
         assert (MAX_SPECTRUM_BIN > WINDOW_RADIUS)
-            else $fatal(1, "MAX_SPECTRUM_BIN过小");
+            else $fatal(1, "MAX_SPECTRUM_BIN is too small");
+        assert (MAX_MEASUREMENT_INDEX_500 > 0)
+            else $fatal(1, "measurement frequency limit must be positive");
     end
 
-    // 将原始宽位能量统一四舍五入右移，并返回{溢出标志,U32结果}。
     function automatic logic [32:0] scale_energy (
         input logic [ENERGY_ACC_WIDTH-1:0] value
     );
@@ -209,10 +165,8 @@ module energy_calculator #(
         begin
             rounded_ext =
                 {1'b0, value} +
-                ({{ENERGY_ACC_WIDTH{1'b0}}, 1'b1} <<
-                 (ENERGY_SHIFT - 1));
+                ({{ENERGY_ACC_WIDTH{1'b0}}, 1'b1} << (ENERGY_SHIFT - 1));
             scaled_ext = rounded_ext >> ENERGY_SHIFT;
-
             if (|scaled_ext[ENERGY_ACC_WIDTH:32]) begin
                 scale_energy = {1'b1, 32'hFFFF_FFFF};
             end else begin
@@ -222,19 +176,16 @@ module energy_calculator #(
     endfunction
 
     always_comb begin
-        case (candidate_order)
-            2'd1: candidate_index_calc =
+        if (candidate_order == 8'd1) begin
+            candidate_index_calc =
                 {{(32-INDEX_WIDTH){1'b0}}, base_index_latched};
-            2'd2: candidate_index_calc =
-                {{(32-INDEX_WIDTH){1'b0}}, base_index_latched} << 1;
-            default: candidate_index_calc =
-                {{(32-INDEX_WIDTH){1'b0}}, base_index_latched} +
-                ({{(32-INDEX_WIDTH){1'b0}}, base_index_latched} << 1);
-        endcase
+        end else begin
+            candidate_index_calc = scan_index_500;
+        end
         candidate_numerator_calc =
             ({8'd0, candidate_index_calc} << 7) + 40'd62;
 
-        // 逐位无符号除法每拍只包含8位比较和减法，避免组合“除以125”长路径。
+        // Forty-cycle unsigned division by 125.
         divide_trial = {divide_remainder[6:0], divide_dividend[39]};
         divide_dividend_next = {divide_dividend[38:0], 1'b0};
         divide_quotient_next =
@@ -248,22 +199,17 @@ module energy_calculator #(
         energy_acc_next =
             energy_acc +
             {{(ENERGY_ACC_WIDTH - POWER_WIDTH){1'b0}}, mem_rdata};
-
         absolute_threshold_ext =
-            {{(ENERGY_ACC_WIDTH-32){1'b0}},
-              absolute_threshold_latched};
+            {{(ENERGY_ACC_WIDTH-32){1'b0}}, absolute_threshold_latched};
 
-        // 显式扩展原始能量，保证比例乘法的完整结果宽度为ENERGY_ACC_WIDTH+16。
         base_ratio_product_calc =
             {{16{1'b0}}, base_energy_raw} * ratio_num_latched;
-        harmonic2_ratio_product_calc =
-            {{16{1'b0}}, harmonic2_energy_raw} * ratio_den_latched;
-        harmonic3_ratio_product_calc =
-            {{16{1'b0}}, harmonic3_energy_raw} * ratio_den_latched;
+        candidate_ratio_product_calc =
+            {{16{1'b0}}, candidate_energy_raw} * ratio_den_latched;
 
-        base_scaled      = scale_energy(base_energy_raw);
-        harmonic2_scaled = scale_energy(harmonic2_energy_raw);
-        harmonic3_scaled = scale_energy(harmonic3_energy_raw);
+        base_scaled       = scale_energy(base_energy_raw);
+        harmonic_a_scaled = scale_energy(harmonic_a_energy_raw);
+        harmonic_b_scaled = scale_energy(harmonic_b_energy_raw);
 
         status_common = 32'd0;
         status_common[2]     = energy_overflow;
@@ -273,28 +219,24 @@ module energy_calculator #(
         status_common[10:8]  = harmonic_present_mask;
         status_common[13:11] = position_valid_mask;
 
-        status_busy       = status_common;
-        status_busy[0]    = 1'b0;
-        status_busy[1]    = 1'b1;
-        status_final      = status_common;
-        status_final[0]   = 1'b1;
-        status_final[1]   = 1'b0;
+        status_busy      = status_common;
+        status_busy[0]   = 1'b0;
+        status_busy[1]   = 1'b1;
+        status_final     = status_common;
+        status_final[0]  = 1'b1;
+        status_final[1]  = 1'b0;
     end
 
     assign request_fire = mem_req && mem_ready;
 
-    // 读取请求由已提交数量直接生成，反压时计数不变，因此地址和req自然保持。
     always_comb begin
         mem_req  = 1'b0;
         mem_addr = window_start_addr + issue_count;
-
-        if ((state == STATE_READ) &&
-            (issue_count < WINDOW_POINTS)) begin
+        if ((state == STATE_READ) && (issue_count < WINDOW_POINTS)) begin
             mem_req = 1'b1;
         end
     end
 
-    // 结果BRAM没有ready接口；每个写状态在当前上升沿完成一次整字写入。
     always_comb begin
         result_bram_en   = 1'b0;
         result_bram_we   = 1'b0;
@@ -314,17 +256,19 @@ module energy_calculator #(
                 result_bram_we   = 1'b1;
                 result_bram_addr = write_addr;
                 case (write_addr)
-                    4'd1: result_bram_din = candidate_index[0];
-                    4'd2: result_bram_din = base_energy_out;
-                    4'd3: result_bram_din = candidate_index[1];
-                    4'd4: result_bram_din = harmonic2_energy_out;
-                    4'd5: result_bram_din = candidate_index[2];
-                    4'd6: result_bram_din = harmonic3_energy_out;
-                    4'd7: result_bram_din = ENERGY_SHIFT;
-                    4'd8: result_bram_din = absolute_threshold_latched;
-                    4'd9: result_bram_din =
+                    4'd1:  result_bram_din = base_index_out;
+                    4'd2:  result_bram_din = base_energy_out;
+                    4'd3:  result_bram_din = harmonic_a_index;
+                    4'd4:  result_bram_din = harmonic_a_energy_out;
+                    4'd5:  result_bram_din = harmonic_b_index;
+                    4'd6:  result_bram_din = harmonic_b_energy_out;
+                    4'd7:  result_bram_din = ENERGY_SHIFT;
+                    4'd8:  result_bram_din = absolute_threshold_latched;
+                    4'd9:  result_bram_din =
                         {ratio_den_latched, ratio_num_latched};
-                    default: result_bram_din = 32'd0; // W10～W15保留字
+                    4'd10: result_bram_din = {24'd0, harmonic_a_order};
+                    4'd11: result_bram_din = {24'd0, harmonic_b_order};
+                    default: result_bram_din = 32'd0;
                 endcase
             end
 
@@ -336,8 +280,8 @@ module energy_calculator #(
             end
 
             default: begin
-                result_bram_en   = 1'b0;
-                result_bram_we   = 1'b0;
+                result_bram_en = 1'b0;
+                result_bram_we = 1'b0;
             end
         endcase
     end
@@ -352,12 +296,11 @@ module energy_calculator #(
             absolute_threshold_latched  <= 32'd0;
             ratio_num_latched           <= 16'd0;
             ratio_den_latched           <= 16'd0;
-            candidate_order             <= 2'd1;
+            candidate_order             <= 8'd1;
+            harmonic_found_count        <= 2'd0;
+            scan_index_500              <= 32'd0;
             current_candidate_index     <= 32'd0;
             candidate_bin_reg           <= 40'd0;
-            candidate_index[0]          <= 32'd0;
-            candidate_index[1]          <= 32'd0;
-            candidate_index[2]          <= 32'd0;
             window_start_addr           <= '0;
             divide_dividend             <= 40'd0;
             divide_quotient             <= 40'd0;
@@ -367,14 +310,17 @@ module energy_calculator #(
             receive_count               <= '0;
             energy_acc                  <= '0;
             base_energy_raw             <= '0;
-            harmonic2_energy_raw        <= '0;
-            harmonic3_energy_raw        <= '0;
+            candidate_energy_raw        <= '0;
+            harmonic_a_energy_raw       <= '0;
+            harmonic_b_energy_raw       <= '0;
             base_energy_out             <= 32'd0;
-            harmonic2_energy_out        <= 32'd0;
-            harmonic3_energy_out        <= 32'd0;
-            base_ratio_product          <= '0;
-            harmonic2_ratio_product     <= '0;
-            harmonic3_ratio_product     <= '0;
+            harmonic_a_energy_out       <= 32'd0;
+            harmonic_b_energy_out       <= 32'd0;
+            base_index_out              <= 32'd0;
+            harmonic_a_index            <= 32'd0;
+            harmonic_b_index            <= 32'd0;
+            harmonic_a_order            <= 8'd0;
+            harmonic_b_order            <= 8'd0;
             harmonic_present_mask       <= 3'b000;
             position_valid_mask         <= 3'b000;
             result_valid                <= 1'b0;
@@ -397,12 +343,11 @@ module energy_calculator #(
                         absolute_threshold_latched <= absolute_threshold;
                         ratio_num_latched          <= ratio_num;
                         ratio_den_latched          <= ratio_den;
-                        candidate_order            <= 2'd1;
+                        candidate_order            <= 8'd1;
+                        harmonic_found_count       <= 2'd0;
+                        scan_index_500              <= 32'd0;
                         current_candidate_index    <= 32'd0;
                         candidate_bin_reg          <= 40'd0;
-                        candidate_index[0]         <= 32'd0;
-                        candidate_index[1]         <= 32'd0;
-                        candidate_index[2]         <= 32'd0;
                         issue_count                <= '0;
                         receive_count              <= '0;
                         energy_acc                 <= '0;
@@ -411,14 +356,17 @@ module energy_calculator #(
                         divide_remainder           <= 8'd0;
                         divide_count               <= 6'd0;
                         base_energy_raw            <= '0;
-                        harmonic2_energy_raw       <= '0;
-                        harmonic3_energy_raw       <= '0;
+                        candidate_energy_raw       <= '0;
+                        harmonic_a_energy_raw      <= '0;
+                        harmonic_b_energy_raw      <= '0;
                         base_energy_out            <= 32'd0;
-                        harmonic2_energy_out       <= 32'd0;
-                        harmonic3_energy_out       <= 32'd0;
-                        base_ratio_product         <= '0;
-                        harmonic2_ratio_product    <= '0;
-                        harmonic3_ratio_product    <= '0;
+                        harmonic_a_energy_out      <= 32'd0;
+                        harmonic_b_energy_out      <= 32'd0;
+                        base_index_out             <= 32'd0;
+                        harmonic_a_index           <= 32'd0;
+                        harmonic_b_index           <= 32'd0;
+                        harmonic_a_order           <= 8'd0;
+                        harmonic_b_order           <= 8'd0;
                         harmonic_present_mask      <= 3'b000;
                         position_valid_mask        <= 3'b000;
                         energy_overflow            <= 1'b0;
@@ -431,19 +379,31 @@ module energy_calculator #(
                 end
 
                 STATE_WRITE_BUSY: begin
-                    state <= STATE_PREPARE;
+                    if (!base_valid_latched || (base_index_latched == '0)) begin
+                        base_invalid <= 1'b1;
+                        state        <= STATE_FINALIZE;
+                    end else begin
+                        state <= STATE_PREPARE;
+                    end
                 end
 
                 STATE_PREPARE: begin
-                    current_candidate_index <= candidate_index_calc;
-                    divide_dividend  <= candidate_numerator_calc;
-                    divide_quotient  <= 40'd0;
-                    divide_remainder <= 8'd0;
-                    divide_count     <= 6'd0;
-                    issue_count   <= '0;
-                    receive_count <= '0;
-                    energy_acc    <= '0;
-                    state         <= STATE_DIVIDE;
+                    if ((candidate_order != 8'd1) &&
+                        ((scan_index_500 > MAX_MEASUREMENT_INDEX_500) ||
+                         (harmonic_found_count == 2'd2) ||
+                         threshold_invalid)) begin
+                        state <= STATE_FINALIZE;
+                    end else begin
+                        current_candidate_index <= candidate_index_calc;
+                        divide_dividend          <= candidate_numerator_calc;
+                        divide_quotient          <= 40'd0;
+                        divide_remainder         <= 8'd0;
+                        divide_count             <= 6'd0;
+                        issue_count              <= '0;
+                        receive_count            <= '0;
+                        energy_acc               <= '0;
+                        state                    <= STATE_DIVIDE;
+                    end
                 end
 
                 STATE_DIVIDE: begin
@@ -459,34 +419,20 @@ module energy_calculator #(
                 end
 
                 STATE_CHECK_POSITION: begin
-                    candidate_index[candidate_order-1'b1] <=
-                        current_candidate_index;
-                    if (base_valid_latched &&
-                        (candidate_bin_reg >= WINDOW_RADIUS) &&
+                    if ((candidate_bin_reg >= WINDOW_RADIUS) &&
                         (candidate_bin_reg <= MAX_CENTER_BIN)) begin
-                        position_valid_mask[candidate_order-1'b1] <= 1'b1;
                         window_start_addr <=
                             candidate_bin_reg[SPECTRUM_ADDR_WIDTH-1:0] -
                             WINDOW_RADIUS;
                         state <= STATE_READ;
+                    end else if (candidate_order == 8'd1) begin
+                        base_invalid <= 1'b1;
+                        state        <= STATE_FINALIZE;
                     end else begin
-                        case (candidate_order)
-                            2'd1: begin
-                                base_energy_raw <= '0;
-                                if (base_valid_latched) begin
-                                    base_invalid <= 1'b1;
-                                end
-                            end
-                            2'd2: harmonic2_energy_raw <= '0;
-                            default: harmonic3_energy_raw <= '0;
-                        endcase
-
-                        if (candidate_order == 2'd3) begin
-                            state <= STATE_RATIO_MULTIPLY;
-                        end else begin
-                            candidate_order <= candidate_order + 1'b1;
-                            state <= STATE_PREPARE;
-                        end
+                        candidate_order <= candidate_order + 1'b1;
+                        scan_index_500  <= scan_index_500 +
+                            {{(32-INDEX_WIDTH){1'b0}}, base_index_latched};
+                        state <= STATE_PREPARE;
                     end
                 end
 
@@ -496,28 +442,17 @@ module energy_calculator #(
                     end
 
                     if (mem_rvalid) begin
-                        // 允许同拍提交新请求并接收旧请求；也兼容零延迟响应模型。
                         if ((receive_count < issue_count) || request_fire) begin
                             if (receive_count == WINDOW_POINTS-1) begin
-                                case (candidate_order)
-                                    2'd1: base_energy_raw <=
-                                        energy_acc_next;
-                                    2'd2: harmonic2_energy_raw <=
-                                        energy_acc_next;
-                                    default: harmonic3_energy_raw <=
-                                        energy_acc_next;
-                                endcase
-
-                                energy_acc <= energy_acc_next;
-                                if (candidate_order == 2'd3) begin
-                                    state <= STATE_RATIO_MULTIPLY;
+                                if (candidate_order == 8'd1) begin
+                                    base_energy_raw <= energy_acc_next;
                                 end else begin
-                                    candidate_order <=
-                                        candidate_order + 1'b1;
-                                    state <= STATE_PREPARE;
+                                    candidate_energy_raw <= energy_acc_next;
                                 end
-                            end else begin
                                 energy_acc <= energy_acc_next;
+                                state      <= STATE_RATIO_MULTIPLY;
+                            end else begin
+                                energy_acc    <= energy_acc_next;
                                 receive_count <= receive_count + 1'b1;
                             end
                         end else begin
@@ -527,33 +462,64 @@ module energy_calculator #(
                 end
 
                 STATE_RATIO_MULTIPLY: begin
-                    base_ratio_product      <= base_ratio_product_calc;
-                    harmonic2_ratio_product <= harmonic2_ratio_product_calc;
-                    harmonic3_ratio_product <= harmonic3_ratio_product_calc;
-                    base_energy_out      <= base_scaled[31:0];
-                    harmonic2_energy_out <= harmonic2_scaled[31:0];
-                    harmonic3_energy_out <= harmonic3_scaled[31:0];
-                    energy_overflow <=
-                        base_scaled[32] ||
-                        harmonic2_scaled[32] ||
-                        harmonic3_scaled[32];
-                    state <= STATE_CHECK;
+                    if (candidate_order == 8'd1) begin
+                        base_ratio_product <= base_ratio_product_calc;
+                    end else begin
+                        candidate_ratio_product <= candidate_ratio_product_calc;
+                    end
+                    state <= STATE_CHECK_CANDIDATE;
                 end
 
-                STATE_CHECK: begin
-                    harmonic_present_mask[0] <=
-                        base_valid_latched && position_valid_mask[0];
-                    harmonic_present_mask[1] <=
-                        position_valid_mask[1] &&
+                STATE_CHECK_CANDIDATE: begin
+                    if (candidate_order == 8'd1) begin
+                        base_index_out          <= current_candidate_index;
+                        harmonic_present_mask[0] <= 1'b1;
+                        position_valid_mask[0]   <= 1'b1;
+                        candidate_order          <= 8'd2;
+                        scan_index_500           <=
+                            ({{(32-INDEX_WIDTH){1'b0}}, base_index_latched} << 1);
+                        state                    <= STATE_PREPARE;
+                    end else if (
                         !threshold_invalid &&
-                        (harmonic2_energy_raw >= absolute_threshold_ext) &&
-                        (harmonic2_ratio_product >= base_ratio_product);
-                    harmonic_present_mask[2] <=
-                        position_valid_mask[2] &&
-                        !threshold_invalid &&
-                        (harmonic3_energy_raw >= absolute_threshold_ext) &&
-                        (harmonic3_ratio_product >= base_ratio_product);
+                        (candidate_energy_raw >= absolute_threshold_ext) &&
+                        (candidate_ratio_product >= base_ratio_product)
+                    ) begin
+                        if (harmonic_found_count == 2'd0) begin
+                            harmonic_a_index          <= current_candidate_index;
+                            harmonic_a_energy_raw     <= candidate_energy_raw;
+                            harmonic_a_order          <= candidate_order;
+                            harmonic_present_mask[1]  <= 1'b1;
+                            position_valid_mask[1]    <= 1'b1;
+                            harmonic_found_count      <= 2'd1;
+                            candidate_order           <= candidate_order + 1'b1;
+                            scan_index_500            <= scan_index_500 +
+                                {{(32-INDEX_WIDTH){1'b0}}, base_index_latched};
+                            state                     <= STATE_PREPARE;
+                        end else begin
+                            harmonic_b_index          <= current_candidate_index;
+                            harmonic_b_energy_raw     <= candidate_energy_raw;
+                            harmonic_b_order          <= candidate_order;
+                            harmonic_present_mask[2]  <= 1'b1;
+                            position_valid_mask[2]    <= 1'b1;
+                            harmonic_found_count      <= 2'd2;
+                            state                     <= STATE_FINALIZE;
+                        end
+                    end else begin
+                        candidate_order <= candidate_order + 1'b1;
+                        scan_index_500  <= scan_index_500 +
+                            {{(32-INDEX_WIDTH){1'b0}}, base_index_latched};
+                        state <= STATE_PREPARE;
+                    end
+                end
 
+                STATE_FINALIZE: begin
+                    base_energy_out       <= base_scaled[31:0];
+                    harmonic_a_energy_out <= harmonic_a_scaled[31:0];
+                    harmonic_b_energy_out <= harmonic_b_scaled[31:0];
+                    energy_overflow <=
+                        base_scaled[32] ||
+                        harmonic_a_scaled[32] ||
+                        harmonic_b_scaled[32];
                     write_addr <= {{(RESULT_ADDR_WIDTH-1){1'b0}}, 1'b1};
                     state      <= STATE_WRITE_RESULTS;
                 end
@@ -567,7 +533,6 @@ module energy_calculator #(
                 end
 
                 STATE_COMMIT: begin
-                    // 本上升沿完成最终W0写入；done随后保持一个完整时钟周期。
                     busy         <= 1'b0;
                     result_valid <= 1'b1;
                     done         <= 1'b1;
@@ -583,12 +548,6 @@ module energy_calculator #(
             endcase
         end
     end
-
-    // 实现问题记录：
-    // 1. 第7个返回数据与保存原始能量发生在同一拍，使用energy_acc_next避免遗漏。
-    // 2. 比例比较先把原始能量扩展16位，避免35位与16位乘法结果被截断。
-    // 3. 最终W0使用独立COMMIT状态，保证它严格晚于W1～W15的全部写入。
-    // 4. 组合除以125无法满足100 MHz，改用40拍逐位除法并流水化比例乘法。
 
 endmodule
 

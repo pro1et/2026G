@@ -3,3 +3,6 @@
 /tmp
 /matlab
 /fpga/HMI
+/fpga/SD
+/fpga/tools
+/xsim.dir

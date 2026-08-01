@@ -356,14 +356,16 @@ PS AXI 基地址：待分配
 | W0 | `0x0000` | `status_word` | 状态、谐波存在掩码、位置有效掩码 |
 | W1 | `0x0004` | `base_index_500` | 基波频率编号 |
 | W2 | `0x0008` | `base_energy` | 基波缩放后能量 |
-| W3 | `0x000C` | `harmonic2_index_500` | 二次谐波频率编号 |
-| W4 | `0x0010` | `harmonic2_energy` | 二次谐波缩放后能量 |
-| W5 | `0x0014` | `harmonic3_index_500` | 三次谐波频率编号 |
-| W6 | `0x0018` | `harmonic3_energy` | 三次谐波缩放后能量 |
+| W3 | `0x000C` | `harmonic_a_index_500` | 从基波向高频扫描时最先检测到的谐波频率编号 |
+| W4 | `0x0010` | `harmonic_a_energy` | 谐波 A 缩放后能量 |
+| W5 | `0x0014` | `harmonic_b_index_500` | 从基波向高频扫描时第二个检测到的谐波频率编号 |
+| W6 | `0x0018` | `harmonic_b_energy` | 谐波 B 缩放后能量 |
 | W7 | `0x001C` | `energy_shift` | 当前规划固定为 3 |
 | W8 | `0x0020` | `absolute_threshold` | 本次使用的绝对能量阈值 |
 | W9 | `0x0024` | `ratio_parameter` | `{ratio_den[15:0], ratio_num[15:0]}` |
-| W10～W15 | `0x0028`～`0x003C` | 保留 | 每帧显式写 0 |
+| W10 | `0x0028` | `harmonic_a_order` | 谐波 A 的实际整数次数；不存在时为 0 |
+| W11 | `0x002C` | `harmonic_b_order` | 谐波 B 的实际整数次数；不存在时为 0 |
+| W12～W15 | `0x0030`～`0x003C` | 保留 | 每帧显式写 0 |
 
 频率编号换算：
 
@@ -385,19 +387,19 @@ frequency_hz = index_500 × 500 Hz
 | 5 | `read_error` | 频谱读取异常 |
 | 7:6 | 保留 | 写 0 |
 | 8 | `base_present` | 基波存在 |
-| 9 | `harmonic2_present` | 二次谐波存在 |
-| 10 | `harmonic3_present` | 三次谐波存在 |
+| 9 | `harmonic_a_present` | 谐波 A 存在 |
+| 10 | `harmonic_b_present` | 谐波 B 存在 |
 | 11 | `base_position_valid` | 基波读取窗口有效 |
-| 12 | `harmonic2_position_valid` | 二次谐波读取窗口有效 |
-| 13 | `harmonic3_position_valid` | 三次谐波读取窗口有效 |
+| 12 | `harmonic_a_position_valid` | 谐波 A 读取窗口有效 |
+| 13 | `harmonic_b_position_valid` | 谐波 B 读取窗口有效 |
 | 31:14 | 保留 | 写 0 |
 
 写入顺序要求：
 
 1. 新测量开始时先写 W0，令 `result_valid=0`、`busy=1`；
-2. 写 W1～W9，并将 W10～W15 显式写 0；
+2. 写 W1～W11，并将 W12～W15 显式写 0；
 3. 最后再次写 W0，令 `busy=0`、`result_valid=1`；
-4. PS 只有看到最终 `W0[0]=1` 后才允许读取 W1～W9。
+4. PS 只有看到最终 `W0[0]=1` 后才允许读取 W1～W11。
 
 该布局来自当前频域设计文档，在 RTL、BD 和 AXI 地址真正完成前仍属于“已规划”
 而不是“已实现”。

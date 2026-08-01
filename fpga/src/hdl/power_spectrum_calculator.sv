@@ -64,6 +64,9 @@ module power_spectrum_calculator #(
 
     logic [RAW_POWER_WIDTH-1:0] re_square_d1;
     logic [RAW_POWER_WIDTH-1:0] im_square_d1;
+    // These DSP datapath registers intentionally have no reset. Reset clears
+    // square_valid_d1, so their contents cannot be consumed before the first
+    // valid FFT sample overwrites them.
     logic [10:0]                power_bin_d1;
     logic                       square_valid_d1;
     logic                       power_first_d1;
@@ -115,8 +118,6 @@ module power_spectrum_calculator #(
         if (rst) begin
             expected_fft_bin <= 12'd0;
 
-            re_square_d1     <= '0;
-            im_square_d1     <= '0;
             power_bin_d1     <= 11'd0;
             square_valid_d1  <= 1'b0;
             power_first_d1   <= 1'b0;

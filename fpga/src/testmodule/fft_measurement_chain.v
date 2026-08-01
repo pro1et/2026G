@@ -6,7 +6,7 @@
 //
 // Purpose:
 //   Production integration top for the filtered time-domain measurement path
-//   and the first-stage FFT power-spectrum verification path.
+//   and the complete FFT/base-frequency/energy-result path.
 //
 // Data path:
 //   clock_tree -> adc_capture -> fifo_wrap -> fir_wrap
@@ -16,6 +16,9 @@
 //              `-> downsampler_16 -> hann_window_4096
 //                  -> fft_4096_wrapper -> power_spectrum_calculator
 //                  -> spectrol -> SPECTRUM_BRAM
+//                               -> base_detector
+//                               -> energy_calculator
+//                                  -> ENERGY_RESULT_BRAM
 //
 // Frame contract:
 //   - ADC and FIFO frame length: FRAME_SIZE=65536 samples.
@@ -27,26 +30,32 @@
 //   - RMS square root and voltage calibration are performed by the PS.
 //
 // Completion contract:
-//   The FIFO frame is not released and capture_done is not asserted until both
-//   TIME_BRAM and SPECTRUM_BRAM have committed a complete new frame.
+//   The FIFO frame is not released and capture_done is not asserted until the
+//   TIME_BRAM waveform/statistics and the complete frequency-domain result
+//   (spectrum write, base detection and ENERGY_RESULT_BRAM commit) are done.
 //   fir_wrap's own completion pulse only marks the last filtered output.
 // ============================================================================
 
 module fft_measurement_chain #(
-    parameter integer FRAME_SIZE        = 65536,
-    parameter integer BRAM_SAMPLE_COUNT = 32768,
-    parameter integer ADC_CHANNEL       = 0
+    parameter integer FRAME_SIZE                   = 65536,
+    parameter integer BRAM_SAMPLE_COUNT            = 32768,
+    // FFT_chain_blk_mem_gen_1_0 Port B is configured with READ_LATENCY_B=1.
+    parameter integer SPECTRUM_BRAM_RD_LATENCY     = 1,
+    // base_detector compatibility ports:
+    //   DETECT = absolute candidate-energy floor
+    //   PROMINENCE = strict pure-tone fallback energy floor
+    parameter [34:0] BASE_DETECT_THRESHOLD         = 35'd1,
+    parameter [34:0] BASE_PROMINENCE_THRESHOLD     = 35'd16,
+    parameter [31:0] ENERGY_ABSOLUTE_THRESHOLD     = 32'd0,
+    parameter [15:0] ENERGY_RATIO_NUM              = 16'd1,
+    parameter [15:0] ENERGY_RATIO_DEN              = 16'd100
 ) (
     input  wire        clk_50m,
     input  wire        rst_n,
     input  wire        capture_start,
 
-    input  wire [9:0]  adc_data_a,
-    input  wire [9:0]  adc_data_b,
+    input  wire [13:0] adc_data_a,
     output wire        adc_clk_a,
-    output wire        adc_clk_b,
-    output wire        adc_oe_a,
-    output wire        adc_oe_b,
 
     output wire        clk_100m_out,
     output wire        rst_100m_n_out,
@@ -83,6 +92,22 @@ module fft_measurement_chain #(
     (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 SPECTRUM_BRAM DOUT" *)
     input  wire [31:0] spectrum_bram_dout,
 
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM CLK" *)
+    output wire        energy_result_bram_clk,
+    (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME ENERGY_RESULT_BRAM, MASTER_TYPE BRAM_CTRL, MEM_ECC NONE, MEM_SIZE 4096, MEM_WIDTH 32, READ_LATENCY 1" *)
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM RST" *)
+    output wire        energy_result_bram_rst,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM EN" *)
+    output wire        energy_result_bram_en,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM WE" *)
+    output wire [3:0]  energy_result_bram_we,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM ADDR" *)
+    output wire [11:0] energy_result_bram_addr,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM DIN" *)
+    output wire [31:0] energy_result_bram_din,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:bram:1.0 ENERGY_RESULT_BRAM DOUT" *)
+    input  wire [31:0] energy_result_bram_dout,
+
     output wire        capture_ready,
     output wire        capture_busy,
     output wire        capture_done,
@@ -101,12 +126,10 @@ module fft_measurement_chain #(
     wire capture_start_pulse;
     wire start_cdc_busy;
     wire start_cdc_error;
-    wire capture_start_32m;
+    wire capture_start_adc;
 
     wire signed [15:0] adc_sample_a;
-    wire signed [15:0] adc_sample_b;
-    wire signed [15:0] adc_sample_selected;
-    wire               adc_valid;
+    wire               adc_valid_a;
 
     wire signed [15:0] fifo_fir_data;
     wire               fifo_fir_valid;
@@ -117,8 +140,8 @@ module fft_measurement_chain #(
 
     wire fifo_capture_busy;
     wire fifo_frame_pending;
-    wire fifo_ready_32m;
-    wire fifo_wr_error_32m;
+    wire fifo_ready_adc;
+    wire fifo_wr_error_adc;
     wire fifo_rd_error_100m;
 
     wire signed [15:0] filtered_data;
@@ -217,12 +240,43 @@ module fft_measurement_chain #(
 
     wire        spectrum_busy;
     wire        spectrum_frame_done;
+    wire        spectrum_write_done_unused;
     wire        spectrum_protocol_error;
     wire        spectrum_bram_en_word;
     wire        spectrum_bram_we_word;
     wire [10:0] spectrum_bram_word_addr;
     wire [31:0] spectrum_bram_word_data;
-    wire        unused_spectrum_bram_dout;
+
+    wire        spectrol_base_start;
+    wire        base_busy_unused;
+    wire        base_done;
+    wire        base_valid;
+    wire [15:0] base_index_500;
+    wire [10:0] base_bin_unused;
+    wire [34:0] base_energy_unused;
+    wire        base_mem_req;
+    wire [10:0] base_mem_addr;
+
+    wire        energy_busy;
+    wire        energy_done;
+    wire        energy_mem_req;
+    wire [10:0] energy_mem_addr;
+    wire        energy_access;
+    wire        shared_mem_req;
+    wire [10:0] shared_mem_addr;
+    wire        shared_mem_ready;
+    wire        shared_mem_rvalid;
+    wire [31:0] shared_mem_rdata;
+
+    wire        energy_result_bram_en_word;
+    wire        energy_result_bram_we_word;
+    wire [3:0]  energy_result_bram_word_addr;
+    wire [31:0] energy_result_bram_word_data;
+    wire [2:0]  harmonic_present_mask_unused;
+    wire [2:0]  position_valid_mask_unused;
+    wire        energy_result_valid_unused;
+    wire        energy_overflow_unused;
+    wire        unused_energy_result_bram_dout;
 
     reg         frame_join_busy;
     reg         time_done_seen;
@@ -263,7 +317,22 @@ module fft_measurement_chain #(
     assign spectrum_bram_we   = {4{spectrum_bram_we_word}};
     assign spectrum_bram_addr = {spectrum_bram_word_addr, 2'b00};
     assign spectrum_bram_din  = spectrum_bram_word_data;
-    assign unused_spectrum_bram_dout = ^spectrum_bram_dout;
+
+    assign energy_result_bram_clk  = clk_100m;
+    assign energy_result_bram_rst  = rst_100m;
+    assign energy_result_bram_en   = energy_result_bram_en_word;
+    assign energy_result_bram_we   = {4{energy_result_bram_we_word}};
+    assign energy_result_bram_addr =
+        {6'd0, energy_result_bram_word_addr, 2'b00};
+    assign energy_result_bram_din  = energy_result_bram_word_data;
+    assign unused_energy_result_bram_dout = ^energy_result_bram_dout;
+
+    // Spectrol owns one physical SPECTRUM_BRAM port. Base detection uses it
+    // first; after base_done the energy calculator becomes the read client.
+    // Base detector has no outstanding response when it asserts base_done.
+    assign energy_access  = energy_busy || base_done;
+    assign shared_mem_req = energy_access ? energy_mem_req : base_mem_req;
+    assign shared_mem_addr = energy_access ? energy_mem_addr : base_mem_addr;
 
     // The register can accept a point when empty, or refill in the same cycle
     // in which the downstream power calculator consumes the current point.
@@ -291,11 +360,8 @@ module fft_measurement_chain #(
         end
     end
 
-    assign adc_sample_selected =
-        (ADC_CHANNEL == 0) ? adc_sample_a : adc_sample_b;
-
     // capture_start is generated in the 100 MHz measurement-control domain.
-    // Convert its rising edge to one event before crossing into the ADC domain.
+    // Convert its rising edge to one event in the internal 32 MHz ADC domain.
     always @(posedge clk_100m) begin
         if (rst_100m) begin
             capture_start_d <= 1'b0;
@@ -322,9 +388,9 @@ module fft_measurement_chain #(
             fifo_capture_busy_sync  <= fifo_capture_busy_meta;
             fifo_frame_pending_meta <= fifo_frame_pending;
             fifo_frame_pending_sync <= fifo_frame_pending_meta;
-            fifo_ready_meta         <= fifo_ready_32m;
+            fifo_ready_meta         <= fifo_ready_adc;
             fifo_ready_sync         <= fifo_ready_meta;
-            fifo_wr_error_meta      <= fifo_wr_error_32m;
+            fifo_wr_error_meta      <= fifo_wr_error_adc;
             fifo_wr_error_sync      <= fifo_wr_error_meta;
         end
     end
@@ -352,7 +418,7 @@ module fft_measurement_chain #(
         end
     end
 
-    // Join the independently timed time-domain and spectrum BRAM commits.
+    // Join the independently timed time-domain and frequency-domain commits.
     // Each producer emits a one-cycle completion pulse, so both events are
     // latched until the pair is complete. Only then may fifo_wrap release the
     // source frame and the AXI control block report DONE to the PS.
@@ -397,7 +463,7 @@ module fft_measurement_chain #(
         locked && !rst_100m && fifo_ready_sync && !capture_busy &&
         !start_cdc_busy;
 
-    // PS sees completion only after both BRAM images are complete.
+    // PS sees completion only after all three BRAM images are complete.
     assign capture_done       = capture_done_reg;
     assign fifo_release_event = capture_done_reg;
 
@@ -421,18 +487,13 @@ module fft_measurement_chain #(
     );
 
     adc_capture u_adc_capture (
-        .clk        (clk_32m),
-        .clk_drive  (clk_32m_adc),
-        .rst        (rst_32m),
-        .adc_data_a (adc_data_a),
-        .adc_data_b (adc_data_b),
-        .adc_clk_a  (adc_clk_a),
-        .adc_clk_b  (adc_clk_b),
-        .adc_oe_a   (adc_oe_a),
-        .adc_oe_b   (adc_oe_b),
-        .data_a     (adc_sample_a),
-        .data_b     (adc_sample_b),
-        .out_valid  (adc_valid)
+        .clk_sample       (clk_32m),
+        .clk_drive        (clk_32m_adc),
+        .rst              (rst_32m),
+        .adc_data_a       (adc_data_a),
+        .adc_clk_a        (adc_clk_a),
+        .data_a           (adc_sample_a),
+        .out_valid_a      (adc_valid_a)
     );
 
     af_cdc u_start_cdc (
@@ -443,7 +504,7 @@ module fft_measurement_chain #(
         .src_protocol_error (start_cdc_error),
         .dst_clk            (clk_32m),
         .dst_rst            (rst_32m),
-        .dst_event          (capture_start_32m)
+        .dst_event          (capture_start_adc)
     );
 
     fifo_wrap #(
@@ -455,9 +516,9 @@ module fft_measurement_chain #(
         .rd_clk         (clk_100m),
         .rd_rst         (rst_100m),
         .fifo_rst       (fifo_rst),
-        .adc_data       (adc_sample_selected),
-        .adc_valid      (adc_valid),
-        .capture_start  (capture_start_32m),
+        .adc_data       (adc_sample_a),
+        .adc_valid      (adc_valid_a),
+        .capture_start  (capture_start_adc),
         .clear_error    (1'b0),
         .fir_data       (fifo_fir_data),
         .fir_valid      (fifo_fir_valid),
@@ -467,8 +528,8 @@ module fft_measurement_chain #(
         .fir_frame_done (fifo_release_event),
         .capture_busy   (fifo_capture_busy),
         .frame_pending  (fifo_frame_pending),
-        .fifo_ready     (fifo_ready_32m),
-        .wr_error       (fifo_wr_error_32m),
+        .fifo_ready     (fifo_ready_adc),
+        .wr_error       (fifo_wr_error_adc),
         .rd_error       (fifo_rd_error_100m)
     );
 
@@ -579,12 +640,16 @@ module fft_measurement_chain #(
         .protocol_error   (power_protocol_error)
     );
 
-    spectrol u_spectrol (
+    spectrol #(
+        .POWER_WIDTH     (32),
+        .BRAM_RD_LATENCY (SPECTRUM_BRAM_RD_LATENCY)
+    ) u_spectrol (
         .clk                (clk_100m),
         .rst                (rst_100m),
         .clear_error        (1'b0),
         .start              (writer_start),
         .busy               (spectrum_busy),
+        .spectrum_write_done(spectrum_write_done_unused),
         .frame_done         (spectrum_frame_done),
         .protocol_error     (spectrum_protocol_error),
         .power_data         (power_data),
@@ -593,10 +658,64 @@ module fft_measurement_chain #(
         .power_ready        (power_ready),
         .power_first        (power_first),
         .power_last         (power_last),
+        .base_start         (spectrol_base_start),
+        .base_done          (energy_done),
+        .base_valid         (base_valid),
+        .base_mem_req       (shared_mem_req),
+        .base_mem_addr      (shared_mem_addr),
+        .base_mem_ready     (shared_mem_ready),
+        .base_mem_rvalid    (shared_mem_rvalid),
+        .base_mem_rdata     (shared_mem_rdata),
         .spectrum_bram_en   (spectrum_bram_en_word),
         .spectrum_bram_we   (spectrum_bram_we_word),
         .spectrum_bram_addr (spectrum_bram_word_addr),
-        .spectrum_bram_din  (spectrum_bram_word_data)
+        .spectrum_bram_din  (spectrum_bram_word_data),
+        .spectrum_bram_dout (spectrum_bram_dout)
+    );
+
+    base_detector u_base_detector (
+        .clk                  (clk_100m),
+        .rst                  (rst_100m),
+        .start                (spectrol_base_start),
+        .detect_threshold     (BASE_DETECT_THRESHOLD),
+        .prominence_threshold (BASE_PROMINENCE_THRESHOLD),
+        .busy                 (base_busy_unused),
+        .mem_req              (base_mem_req),
+        .mem_addr             (base_mem_addr),
+        .mem_ready            (shared_mem_ready && !energy_access),
+        .mem_rvalid           (shared_mem_rvalid && !energy_access),
+        .mem_rdata            (shared_mem_rdata),
+        .base_valid           (base_valid),
+        .base_done            (base_done),
+        .base_index_500       (base_index_500),
+        .base_bin             (base_bin_unused),
+        .base_energy          (base_energy_unused)
+    );
+
+    energy_calculator u_energy_calculator (
+        .clk                     (clk_100m),
+        .rst                     (rst_100m),
+        .start                   (base_done),
+        .busy                    (energy_busy),
+        .done                    (energy_done),
+        .base_valid              (base_valid),
+        .base_index_500          (base_index_500),
+        .absolute_threshold      (ENERGY_ABSOLUTE_THRESHOLD),
+        .ratio_num               (ENERGY_RATIO_NUM),
+        .ratio_den               (ENERGY_RATIO_DEN),
+        .mem_req                 (energy_mem_req),
+        .mem_addr                (energy_mem_addr),
+        .mem_ready               (shared_mem_ready && energy_access),
+        .mem_rvalid              (shared_mem_rvalid && energy_access),
+        .mem_rdata               (shared_mem_rdata),
+        .result_bram_en          (energy_result_bram_en_word),
+        .result_bram_we          (energy_result_bram_we_word),
+        .result_bram_addr        (energy_result_bram_word_addr),
+        .result_bram_din         (energy_result_bram_word_data),
+        .harmonic_present_mask   (harmonic_present_mask_unused),
+        .position_valid_mask     (position_valid_mask_unused),
+        .result_valid            (energy_result_valid_unused),
+        .energy_overflow         (energy_overflow_unused)
     );
 
     peak_to_peak_detector #(
@@ -671,9 +790,6 @@ module fft_measurement_chain #(
         end
         if (BRAM_SAMPLE_COUNT != 32768) begin
             $error("fft_measurement_chain: current TIME_BRAM contract requires 32768 samples");
-        end
-        if ((ADC_CHANNEL < 0) || (ADC_CHANNEL > 1)) begin
-            $error("fft_measurement_chain: ADC_CHANNEL must be 0 or 1");
         end
     end
     // synthesis translate_on

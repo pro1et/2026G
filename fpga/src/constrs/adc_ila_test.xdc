@@ -1,24 +1,16 @@
 # =============================================================================
-# FFT_chain_wrapper board constraints
-#   - Mizar Z7 system clock and PL reset
-#   - ADS6149 channel A on GPIO2/JP2
-#   - PS UART1 EMIO for the HMI
-#
-# Expected wrapper ports after refreshing fft_measurement_chain:
-#   clk_50m_0, rst_n_0
-#   adc_data_a_0[13:0], adc_clk_a_0
-#   UART1_TX_0, UART1_RX_0
+# Minimal ADC + ILA test constraints for ADC_ILA_test_wrapper.
+# Expected BD external ports:
+#   clk_50m_0, rst_n_0, adc_data_a_0[13:0], adc_clk_a_0
+# The ADS6149 returned clock is intentionally unused.
 # =============================================================================
 
-# 50 MHz PL clock. clk_wiz_0.xdc owns the primary create_clock constraint.
 set_property -dict {PACKAGE_PIN H16 IOSTANDARD LVCMOS33} \
     [get_ports {clk_50m_0}]
 
-# PL_KEY1/K4, active low.
 set_property -dict {PACKAGE_PIN R19 IOSTANDARD LVCMOS33} \
     [get_ports {rst_n_0}]
 
-# ADS6149 channel-A 14-bit two's-complement data bus.
 set_property -dict {PACKAGE_PIN H18 IOSTANDARD HSTL_II_18} [get_ports {adc_data_a_0[0]}]
 set_property -dict {PACKAGE_PIN J18 IOSTANDARD HSTL_II_18} [get_ports {adc_data_a_0[1]}]
 set_property -dict {PACKAGE_PIN G18 IOSTANDARD HSTL_II_18} [get_ports {adc_data_a_0[2]}]
@@ -34,34 +26,14 @@ set_property -dict {PACKAGE_PIN L14 IOSTANDARD HSTL_II_18} [get_ports {adc_data_
 set_property -dict {PACKAGE_PIN J19 IOSTANDARD HSTL_II_18} [get_ports {adc_data_a_0[12]}]
 set_property -dict {PACKAGE_PIN K19 IOSTANDARD HSTL_II_18} [get_ports {adc_data_a_0[13]}]
 
-# Forwarded sample clock. ADC data is captured by the internal 32 MHz clock;
-# the adapter return-clock pin is intentionally unused in this build.
 set_property -dict {PACKAGE_PIN L19 IOSTANDARD LVCMOS33} \
     [get_ports {adc_clk_a_0}]
-set_property INTERNAL_VREF 0.9 [get_iobanks 34]
-set_property INTERNAL_VREF 0.9 [get_iobanks 35]
 set_property -dict {SLEW FAST DRIVE 12 OFFCHIP_TERM NONE} \
     [get_ports {adc_clk_a_0}]
 
-# HMI UART1 through PS UART1 EMIO.
-set_property -dict {PACKAGE_PIN T11 IOSTANDARD LVCMOS33} [get_ports {UART1_TX_0}]
-set_property -dict {PACKAGE_PIN T10 IOSTANDARD LVCMOS33} [get_ports {UART1_RX_0}]
+set_property INTERNAL_VREF 0.9 [get_iobanks 34]
+set_property INTERNAL_VREF 0.9 [get_iobanks 35]
 
-# Forwarded ADC clock and asynchronous reset are not ordinary data paths.
 set_false_path -to [get_ports {adc_clk_a_0}]
 set_false_path -from [get_ports {rst_n_0}]
 
-# Ignore only the asynchronous source-to-first-stage portion of custom CDCs.
-set custom_cdc_stage0_pins [get_pins -hierarchical -quiet -regexp \
-    {^.*/(req_sync_reg|ack_sync_reg|ready_sync_reg|busy_sync_reg|error_sync_reg|locked_sync_reg)\[0\]/D$}]
-set top_status_cdc_stage0_pins [get_pins -hierarchical -quiet -regexp \
-    {^.*/fifo_(capture_busy|frame_pending|ready|wr_error)_meta_reg/D$}]
-set_false_path -to $custom_cdc_stage0_pins
-set_false_path -to $top_status_cdc_stage0_pins
-
-# PS FCLK and PL Clock Wizard clocks cross only through synchronizers.
-set ps_clock_group [get_clocks -quiet -include_generated_clocks {clk_fpga_0}]
-set pl_clock_group [get_clocks -quiet -include_generated_clocks {clk_50m_0}]
-set_clock_groups -asynchronous \
-    -group $ps_clock_group \
-    -group $pl_clock_group
